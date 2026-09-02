@@ -103,6 +103,14 @@ point of the section), a sticky bar with the live price and a Buy button follows
 you once you're past the hero, and the layout is checked for horizontal overflow
 at 360px, 390px and 1280px in a real browser via `npm run shots`.
 
+**Motion on phones** — Android Chrome reports `prefers-reduced-motion` whenever
+battery saver is on, so the usual blanket "disable every animation" rule leaves
+most phones looking at a static page. Instead only the two things that genuinely
+cause discomfort are switched off under that setting: page-wide smooth scrolling
+and the large continuous drift behind the layout. The small local touches — the
+glass sweep, the wordmark sheen, the dog's float, the marquee, entrance fades —
+keep running. `test/motion.test.js` asserts both states in a real browser.
+
 **Market strip** — price, 24h move, volume and liquidity come from the
 DexScreener API for your exact pool, polled every 30s and paused in a background
 tab.
@@ -245,12 +253,17 @@ header and shape all differ from the defaults.
 https://shopping.io/robin/api/ai.php?selftest=1&probe=1
 ```
 
-The probe prints the provider's own error for every root, auth header and
-endpoint shape it tried. If nothing answers `200`, your API root is not among
-the guesses — take it from your provider's docs and either set `API_ROOT` at
-the top of `api/ai.php`, or set the `ROBIN_AI_ROOTS` environment variable
-(comma separated) to have discovery try yours first. No code change needed for
-the second option.
+The probe streams its results as it goes and survives a 30-second execution
+limit, so you always see how far it got. It tells three failures apart:
+
+- **No host answered at all** — your server cannot make outbound HTTPS requests.
+  Nothing in this project can fix that; ask your host to allow outbound
+  connections on port 443 for your account. On InMotion, quote them:
+  *"PHP cURL cannot make outbound HTTPS requests to external APIs."*
+- **401/403 everywhere** — the key is wrong, inactive, or out of credit.
+- **404 everywhere** — the API root is none of the ones tried. Take it from your
+  provider's docs and set `API_ROOT`, or set the `ROBIN_AI_ROOTS` environment
+  variable (comma separated) to have discovery try yours first — no code change.
 
 ### Two API shapes
 

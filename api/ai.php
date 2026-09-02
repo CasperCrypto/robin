@@ -213,8 +213,22 @@ function endpoint(string $key, bool $forceRediscover = false): array {
  */
 if (isset($_GET['selftest'])) {
     header('Content-Type: text/plain; charset=utf-8');
+    header('X-Accel-Buffering: no');       // stop nginx buffering the stream
 
-    $line = fn(string $l = '') => print($l . "\n");
+    /* This walks a lot of endpoints, so it must survive a default 30-second
+       execution limit AND show its work as it goes. Without flushing, a host
+       that kills the script discards everything written so far — which looks
+       exactly like the probe printing nothing at all. */
+    @set_time_limit(300);
+    @ini_set('output_buffering', '0');
+    @ini_set('zlib.output_compression', '0');
+    while (ob_get_level() > 0) { @ob_end_flush(); }
+    @ob_implicit_flush(true);
+
+    $line = function (string $l = '') {
+        echo $l . "\n";
+        @flush();
+    };
     $line('$ROBIN meme forge — self test');
     $line(str_repeat('=', 46));
     $line();
@@ -264,13 +278,19 @@ if (isset($_GET['selftest'])) {
         $line('(looking for one that answers 200)');
         $line();
         $winner = null;
+        $anyHttp = false;
 
         foreach (array_unique($roots) as $root) {
             foreach ($auths as $label => $mk) {
+                // Printed before the request, so a hang shows where it stopped.
+                echo '  ... ' . str_pad($label, 22) . ' ' . $root . "\r";
+                @flush();
+
                 $ch = curl_init(rtrim($root, '/') . PATH_MODELS);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 15,
+                    CURLOPT_TIMEOUT => 6,
+                    CURLOPT_CONNECTTIMEOUT => 4,
                     CURLOPT_HTTPHEADER => array_merge($mk($key), ['Accept: application/json']),
                 ]);
                 $raw  = curl_exec($ch);
@@ -296,6 +316,14 @@ if (isset($_GET['selftest'])) {
                 }
                 $line('  ' . $tag . ' ' . str_pad($label, 22) . ' ' . $root);
                 if ($note !== '') $line('       ' . substr((string)$note, 0, 150));
+
+                // No HTTP answer at all means the host is unreachable from this
+                // server — the other three auth headers will fare no better.
+                if ($code === 0) {
+                    $line('       (no HTTP response — skipping the other auth styles for this root)');
+                    break;
+                }
+                $anyHttp = true;
             }
         }
 
@@ -308,7 +336,8 @@ if (isset($_GET['selftest'])) {
                 $ch = curl_init(rtrim($winner['root'], '/') . $path);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 15,
+                    CURLOPT_TIMEOUT => 6,
+                    CURLOPT_CONNECTTIMEOUT => 4,
                     CURLOPT_HTTPHEADER => [authHeader($key), 'Accept: application/json'],
                 ]);
                 curl_exec($ch);
@@ -334,12 +363,26 @@ if (isset($_GET['selftest'])) {
             if ($winner['auth'] !== 'Authorization: Bearer') {
                 $line('    Also set AUTH_STYLE to: ' . $winner['auth']);
             }
+        } elseif (!$anyHttp) {
+            $line('>>> No host answered at all.');
+            $line();
+            $line('    Not one request got an HTTP response, so this is a network problem');
+            $line('    on the server, not a key or endpoint problem. Your host is blocking');
+            $line('    outbound HTTPS from PHP.');
+            $line();
+            $line('    On InMotion and most cPanel hosts this is fixed by asking support to');
+            $line('    allow outbound connections on port 443 for your account, or to');
+            $line('    whitelist the API domain. Quote them this line:');
+            $line('        "PHP cURL cannot make outbound HTTPS requests to external APIs"');
         } else {
-            $line('>>> Nothing answered 200.');
-            $line('    Every combination was refused, so the key itself is the most likely');
-            $line('    problem — check it is active and has credit at your provider. If the');
-            $line('    messages above mention an unknown path, the API root is different');
-            $line('    from all five tried; take it from your provider docs and set API_ROOT.');
+            $line('>>> Answers came back, but none was a 200.');
+            $line();
+            $line('    The server can reach the internet, so this is the key or the root:');
+            $line('      * 401 / 403 everywhere  -> the key is wrong, inactive or out of credit');
+            $line('      * 404 everywhere        -> the API root is none of the five tried;');
+            $line('                                 take it from your provider docs and set');
+            $line('                                 API_ROOT, or the ROBIN_AI_ROOTS env var');
+            $line('    Read the provider messages above — they usually say which.');
         }
         exit;
     }

@@ -118,13 +118,20 @@ input{font:inherit;color:inherit}
 :focus-visible{outline:3px solid var(--ink);outline-offset:3px;border-radius:8px}
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
+/*
+   Android Chrome reports prefers-reduced-motion whenever battery saver is on,
+   which is often — and a blanket kill here meant most phones saw a completely
+   static page. So rather than switch everything off, switch off the two things
+   that actually cause discomfort: page-wide smooth scrolling, and the large
+   continuous drift behind the whole layout. The small local touches — the glass
+   sweep, the specular sheen, the dog's float, entrance fades — keep running,
+   because they are the design and they move a few pixels at a time.
+*/
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
-  *,*::before,*::after{
-    animation-duration:.01ms!important;animation-iteration-count:1!important;
-    transition-duration:.01ms!important;
-  }
+  body::before{animation:none}
 }
+@keyframes fade{from{opacity:0}to{opacity:1}}
 
 /* ══════════════════════════════════════════════════ the liquid glass system */
 /*
@@ -270,6 +277,12 @@ input{font:inherit;color:inherit}
 .enter-4{animation-delay:.25s}
 .enter-5{animation-delay:.32s}
 .enter-6{animation-delay:.39s}
+
+/* Declared after .enter so it wins the cascade: the entrance still happens,
+   it just fades in place instead of travelling. */
+@media (prefers-reduced-motion:reduce){
+  .enter{animation-name:fade}
+}
 
 /* Below-fold reveal. Armed by JS only for what starts offscreen, so the first
    painted frame is always complete. */
