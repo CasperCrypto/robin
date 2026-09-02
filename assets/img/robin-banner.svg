@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 600" width="1800" height="600" role="img" aria-label="$ROBIN on Robinhood Chain">
+  <defs>
+    <linearGradient id="bchrome" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".42" stop-color="#f4f8ee"/>
+      <stop offset=".5" stop-color="#b9c8a6"/><stop offset=".58" stop-color="#ffffff"/><stop offset="1" stop-color="#dfeac9"/>
+    </linearGradient>
+    <linearGradient id="bglass" x1=".2" y1="0" x2=".8" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset=".5" stop-color="#ffffff" stop-opacity=".5"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".8"/>
+    </linearGradient>
+    <filter id="bsoft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#2a4a00" flood-opacity=".32"/>
+    </filter>
+  </defs>
+
+  <rect width="1800" height="600" fill="#A8DC2B"/>
+  <g opacity=".16" stroke="#ffffff" stroke-width="2" fill="none">
+    <path d="M1180 600 Q1420 420 1800 400"/><path d="M1240 600 Q1470 450 1800 460"/>
+    <path d="M1300 600 Q1520 490 1800 520"/><path d="M1120 600 Q1380 390 1800 340"/>
+  </g>
+
+  <!-- chrome feather mark -->
+  <g filter="url(#bsoft)">
+    <path d="M150 150 L272 150 L200 300 L266 300 L150 470 L184 330 L124 330 Z" fill="url(#bchrome)"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="390" y="378" font-family="Archivo,Inter,Helvetica,Arial,sans-serif" font-size="188" font-weight="900"
+        letter-spacing="-8" fill="url(#bchrome)" filter="url(#bsoft)">$ROBIN</text>
+
+  <!-- glass P (Pons) -->
+  <g filter="url(#bsoft)">
+    <path d="M1030 168 h96 a92 92 0 0 1 0 184 h-40 v104 a26 26 0 0 1-26 26 h-30 a26 26 0 0 1-26-26 V194 a26 26 0 0 1 26-26 Z
+             M1086 236 v48 h34 a24 24 0 0 0 0-48 Z"
+          fill="url(#bglass)" stroke="#ffffff" stroke-width="5" stroke-opacity=".9"/>
+  </g>
+
+  <!-- doge -->
+  <g transform="translate(1360 130) scale(0.86)">
+    <g stroke="#2B2116" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M168 232 L150 118 L246 176 Z" fill="#EBA33C"/>
+      <path d="M352 232 L372 118 L276 176 Z" fill="#EBA33C"/>
+      <path d="M256 138c86 0 150 62 155 154 5 96-58 172-155 174-97-2-160-78-155-174 5-92 69-154 155-154Z" fill="#EBA33C"/>
+      <path d="M232 292c40 0 72 26 76 62 3 30-18 54-52 58-38 4-70-16-74-46-4-36 20-74 50-74Z" fill="#FBEBD2" stroke="none"/>
+      <path d="M214 330c16 0 29 9 29 20 0 12-13 21-29 21s-29-9-29-21c0-11 13-20 29-20Z" fill="#1E1A14" stroke="none"/>
+      <path d="M214 371v16c0 14-12 24-27 24-13 0-24-8-27-19" fill="none" stroke="#1E1A14" stroke-width="8"/>
+      <path d="M214 387c4 12 16 20 31 20 12 0 22-4 29-11" fill="none" stroke="#1E1A14" stroke-width="8"/>
+      <g stroke="none"><ellipse cx="196" cy="272" rx="21" ry="23" fill="#241C10"/><ellipse cx="330" cy="272" rx="21" ry="23" fill="#241C10"/>
+        <circle cx="204" cy="263" r="7" fill="#fff"/><circle cx="338" cy="263" r="7" fill="#fff"/></g>
+      <g fill="none" stroke="#15120D" stroke-width="13" stroke-linejoin="round">
+        <rect x="152" y="238" width="94" height="72" rx="22"/><rect x="286" y="238" width="94" height="72" rx="22"/>
+        <path d="M246 268h40"/><path d="M152 258c-12-3-22-2-30 3"/><path d="M380 258c12-3 22-2 30 3"/></g>
+      <path d="M118 214c-6-16 4-30 20-40 44-28 96-46 148-46 44 0 82 12 108 34 14 12 18 26 10 38-10 14-34 18-70 16-64-4-128 0-176 10-22 4-34 2-40-12Z" fill="#2E9440"/>
+      <path d="M110 208c46-14 118-22 190-20 44 1 82 6 108 14 12 4 14 14 4 20-12 8-40 12-84 12-84-1-156 3-196 10-18 3-30-2-32-14-1-9 4-18 10-22Z" fill="#1F7530"/>
+      <path d="M352 128c26-34 62-56 96-62-8 36-24 68-46 90-16 16-34 22-48 18-8-12-8-30-2-46Z" fill="#FBFCF7"/>
+      <path d="M448 66c-30 22-62 54-88 92" fill="none" stroke="#C9CFC2" stroke-width="6"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>$ROBIN — Robin Nakamoto on Robinhood Chain</title>
+<meta name="description" content="Robin Nakamoto ($ROBIN) — the memecoin of Robinhood Chain. Live price, on-page swap, real-time buy feed and an AI that actually knows the token.">
+<meta name="theme-color" content="#A8DC2B">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/robin-logo.png">
+<link rel="canonical" href="https://shopping.io/robin">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="$ROBIN — Robin Nakamoto on Robinhood Chain">
+<meta property="og:description" content="Steal from the charts, give to the holders. Live price, swap, buy feed and AI on Robinhood Chain.">
+<meta property="og:url" content="https://shopping.io/robin">
+<meta property="og:image" content="https://shopping.io/robin/assets/img/robin-banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="$ROBIN — Robin Nakamoto">
+<meta name="twitter:description" content="The memecoin of Robinhood Chain. 30% gifted to Billy Markus.">
+<meta name="twitter:image" content="https://shopping.io/robin/assets/img/robin-banner.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<!-- refraction filter used by the liquid-glass chips -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="refract">
+    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.014" numOctaves="2" seed="7" result="n"/>
+    <feGaussianBlur in="n" stdDeviation="3" result="nb"/>
+    <feDisplacementMap in="SourceGraphic" in2="nb" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+
+<!-- ══════════════════════════════════════════════════════════════ nav ── -->
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <img src="assets/img/robin-logo.png" alt="" width="38" height="38"
+           onerror="this.onerror=null;this.src='assets/img/robin-logo.svg'">
+      <span>$ROBIN</span>
+    </a>
+    <nav class="nav-links" id="navLinks" aria-label="Primary">
+      <a href="#swap">Swap</a>
+      <a href="#feed">Live buys</a>
+      <a href="#tokenomics">Tokenomics</a>
+      <a href="#ai">Robin AI</a>
+      <a href="#community">Community</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <button class="btn btn-dark" id="navConnect" type="button">Connect</button>
+      <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><span></span></button>
+    </div>
+  </div>
+</header>
+
+<!-- ═════════════════════════════════════════════════════════════ hero ── -->
+<section class="hero" id="top">
+  <div class="hero-bg" aria-hidden="true">
+    <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="grid"></div>
+  </div>
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow">🏹 Live on Robinhood Chain · #4663</span>
+        <h1 class="chrome" data-text="$ROBIN">$ROBIN</h1>
+        <p class="tagline">Robin Nakamoto — steal from the charts,<br>give to the holders.</p>
+        <p class="lede">
+          The memecoin native to <b>Robinhood Chain</b>. Launched through the Pons
+          bonding curve, graduated into a permanently locked Uniswap&nbsp;V4 pool,
+          and <b>30% of supply gifted to Billy Markus</b> — the man who made Dogecoin.
+        </p>
+
+        <div class="hero-actions">
+          <a class="btn btn-dark btn-lg" href="#swap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5M12 5v14"/></svg>
+            Buy $ROBIN
+          </a>
+          <a class="btn btn-glass btn-lg" id="chartLink" href="#" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-5 3 3 5-7"/></svg>
+            Live chart
+          </a>
+        </div>
+
+        <div class="ca lens" title="Official contract address">
+          <span class="ca-label">Contract</span>
+          <span class="ca-val" id="caVal">—</span>
+          <button class="ca-copy" id="caCopy" type="button" aria-label="Copy contract address">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="hero-art">
+        <img class="doge" src="assets/img/robin-logo.png" width="512" height="512"
+             alt="Robin Nakamoto — a Shiba Inu in a green Robin Hood hat and black glasses"
+             onerror="this.onerror=null;this.src='assets/img/robin-logo.svg'">
+        <div class="badge lens badge-a">🏹 100% locked LP</div>
+        <div class="badge lens badge-b">🐕 30% → Billy</div>
+      </div>
+    </div>
+
+    <!-- live market strip -->
+    <div class="stats" id="stats">
+      <div class="stat"><div class="k">Price</div><div class="v" id="sPrice"><span class="skel"></span></div></div>
+      <div class="stat"><div class="k">24h</div><div class="v" id="sChange"><span class="skel"></span></div></div>
+      <div class="stat"><div class="k">Market cap</div><div class="v" id="sMcap"><span class="skel"></span></div></div>
+      <div class="stat"><div class="k">24h volume</div><div class="v" id="sVol"><span class="skel"></span></div></div>
+      <div class="stat"><div class="k">Liquidity</div><div class="v" id="sLiq"><span class="skel"></span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════ marquee ── -->
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track" id="marquee"></div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════ swap ── -->
+<section class="sec dark" id="swap">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">Trade</span>
+      <h2 class="sec-title">Swap in three taps.</h2>
+      <p class="sec-sub">Connect, pick an amount, confirm. Balances and quotes are read live
+        from Robinhood Chain — no sign-up, no custody, no middleman taking a cut.</p>
+    </div>
+
+    <div class="swap-layout">
+      <!-- how to buy -->
+      <div class="steps rv">
+        <div class="step glass">
+          <div class="n">1</div>
+          <div><h4>Get onto Robinhood Chain</h4>
+            <p>Any EVM wallet works — MetaMask, Rabby, Coinbase Wallet. Hit connect and the
+               site adds <b>Robinhood Chain (4663)</b> for you. Gas is paid in ETH.</p></div>
+        </div>
+        <div class="step glass">
+          <div class="n">2</div>
+          <div><h4>Bridge a little ETH</h4>
+            <p>Bring ETH over with the official Robinhood Chain bridge. A few dollars covers
+               gas for a long time — blocks are cheap here.</p></div>
+        </div>
+        <div class="step glass">
+          <div class="n">3</div>
+          <div><h4>Swap ETH → $ROBIN</h4>
+            <p>Use the panel on the right, or trade straight from
+               <a href="#" id="stepPons" target="_blank" rel="noopener">Pons</a> and
+               <a href="#" id="stepDex" target="_blank" rel="noopener">DexScreener</a>.
+               Always check the contract matches the one in the header.</p></div>
+        </div>
+        <div class="step glass">
+          <div class="n">4</div>
+          <div><h4>Hold like an outlaw</h4>
+            <p>Liquidity is locked in a Uniswap V4 pool that can't be pulled. The only exit
+               that matters is the one you choose.</p></div>
+        </div>
+      </div>
+
+      <!-- swap card -->
+      <div class="swap glass rv" id="swapCard">
+        <div class="swap-head">
+          <h3>Swap</h3>
+          <span class="swap-net"><i class="dot off" id="netDot"></i><span id="netLabel">Not connected</span></span>
+        </div>
+
+        <div class="leg" id="legFrom">
+          <div class="leg-top">
+            <span>You pay</span>
+            <span class="leg-bal">Balance: <b id="balFrom">—</b><button class="leg-max" id="maxBtn" type="button">MAX</button></span>
+          </div>
+          <div class="leg-row">
+            <input id="amtIn" type="number" inputmode="decimal" placeholder="0.0" min="0" step="any" aria-label="Amount to pay">
+            <span class="coin"><span class="ico" id="icoFrom"></span><span id="symFrom">ETH</span></span>
+          </div>
+          <div class="leg-fiat" id="fiatIn"></div>
+        </div>
+
+        <div class="flip">
+          <button id="flipBtn" type="button" aria-label="Switch direction">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 20l-3-3M17 20V4M17 4l3 3"/></svg>
+          </button>
+        </div>
+
+        <div class="leg" id="legTo">
+          <div class="leg-top">
+            <span>You receive</span>
+            <span class="leg-bal">Balance: <b id="balTo">—</b></span>
+          </div>
+          <div class="leg-row">
+            <input id="amtOut" type="text" placeholder="0.0" readonly aria-label="Amount received (estimated)">
+            <span class="coin"><span class="ico" id="icoTo"></span><span id="symTo">ROBIN</span></span>
+          </div>
+          <div class="leg-fiat" id="fiatOut"></div>
+        </div>
+
+        <div class="presets" id="presets"></div>
+
+        <div class="swap-meta">
+          <div class="row"><span>Rate</span><b id="mRate">—</b></div>
+          <div class="row"><span>Minimum received</span><b id="mMin">—</b></div>
+          <div class="row"><span>Network</span><b>Robinhood Chain · ETH gas</b></div>
+          <div class="row"><span>Slippage</span><span class="slip" id="slip"></span></div>
+        </div>
+
+        <button class="btn btn-lime btn-lg btn-block swap-cta" id="swapBtn" type="button">Connect wallet</button>
+        <div class="swap-note" id="swapNote">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+          <span>Quotes come from the live Uniswap V4 pool. Confirm every transaction in your own wallet — this site never holds your keys.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════════════════════════════════════════════════ buy feed ── -->
+<section class="sec dark" id="feed" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">On-chain</span>
+      <h2 class="sec-title">Every buy, as it lands.</h2>
+      <p class="sec-sub">Streamed straight from Robinhood Chain — no bot, no backend, no delay.
+        Bigger bags get a bigger doge.</p>
+    </div>
+
+    <div class="feed glass rv">
+      <div class="feed-head">
+        <h3><i class="dot" id="feedDot"></i> Live trades</h3>
+        <span style="font-size:12.5px;opacity:.62" id="feedMeta">connecting…</span>
+      </div>
+      <div class="feed-list" id="feedList">
+        <div class="feed-empty">Watching the chain for the next buy…</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════ tokenomics ── -->
+<section class="sec dark" id="tokenomics" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">Supply</span>
+      <h2 class="sec-title">Fixed supply. Locked liquidity.</h2>
+      <p class="sec-sub">One billion $ROBIN, minted once by the Pons factory. No mint function,
+        no team unlocks, no hidden wallet waiting to dump on you.</p>
+    </div>
+
+    <div class="tok-grid">
+      <div class="tok-list rv" id="tokList"></div>
+
+      <div class="billy glass rv">
+        <div class="ring">🐕</div>
+        <h3>30% went to Billy Markus</h3>
+        <p>We sent nearly a third of the entire supply to <b>Shibetoshi Nakamoto</b> —
+           the developer who co-created Dogecoin and started all of this. No strings,
+           no vesting cliff, no deal. Just the biggest tip in Robinhood Chain history.</p>
+        <div class="quote">"Robin Nakamoto: the dog that gives it back."</div>
+        <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+          <a class="btn btn-glass on-dark" id="billyScan" href="#" target="_blank" rel="noopener">Verify on explorer</a>
+          <a class="btn btn-glass on-dark" href="https://x.com/BillyM2k" target="_blank" rel="noopener">@BillyM2k</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ ai ── -->
+<section class="sec dark" id="ai" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow">✨ Powered by OpenRouter</span>
+      <h2 class="sec-title">Robin AI</h2>
+      <p class="sec-sub">An assistant that reads the live chart before it opens its mouth.
+        Ask it anything, get an honest read on the market, or let it write your next post.</p>
+    </div>
+
+    <div class="ai-tabs rv" role="tablist">
+      <button class="ai-tab on" data-pane="chat"  role="tab" aria-selected="true">Ask Nakamoto</button>
+      <button class="ai-tab"    data-pane="alpha" role="tab" aria-selected="false">Alpha report</button>
+      <button class="ai-tab"    data-pane="meme"  role="tab" aria-selected="false">Meme forge</button>
+    </div>
+
+    <div class="ai-panel glass rv">
+      <!-- chat -->
+      <div class="ai-pane on" data-pane="chat">
+        <div class="ai-log" id="aiLog"></div>
+        <div class="ai-chips" id="aiChips"></div>
+        <form class="ai-form" id="aiForm">
+          <input id="aiInput" type="text" placeholder="How do I get ETH onto Robinhood Chain?" autocomplete="off" aria-label="Ask Robin AI">
+          <button class="btn btn-lime" type="submit">Send</button>
+        </form>
+      </div>
+
+      <!-- alpha -->
+      <div class="ai-pane" data-pane="alpha">
+        <p style="margin:0 0 16px;font-size:14.5px;opacity:.66">
+          Robin pulls the live price, volume, liquidity and 24h move, then tells you what it
+          actually thinks — including when it thinks nothing is happening.</p>
+        <div class="ai-out" id="alphaOut"><div class="ph">Hit the button for a fresh read.</div></div>
+        <button class="btn btn-lime btn-block" id="alphaBtn" type="button" style="margin-top:16px">Generate alpha report</button>
+      </div>
+
+      <!-- meme -->
+      <div class="ai-pane" data-pane="meme">
+        <p style="margin:0 0 14px;font-size:14.5px;opacity:.66">
+          Give it an angle and it writes three posts you can ship straight to X.</p>
+        <div class="ai-chips" id="memeChips"></div>
+        <form class="ai-form" id="memeForm" style="margin-bottom:16px">
+          <input id="memeInput" type="text" placeholder="e.g. Billy Markus just got 30% of the supply" autocomplete="off" aria-label="Meme angle">
+          <button class="btn btn-lime" type="submit">Forge</button>
+        </form>
+        <div class="ai-out" id="memeOut"><div class="ph">Your posts will appear here.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════ community ── -->
+<section class="sec dark" id="community" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">The band</span>
+      <h2 class="sec-title">Merry men wanted.</h2>
+      <p class="sec-sub">$ROBIN is shipped by the Shopping.io team — the people who took a
+        token to a $300M market cap in 2021. We've done this before.</p>
+    </div>
+
+    <div class="social-grid">
+      <div class="tw-embed glass rv" id="twEmbed">
+        <div class="tw-fallback">
+          <div style="font-size:42px;margin-bottom:10px">𝕏</div>
+          <p style="margin:0">Loading the latest from the timeline…</p>
+          <a class="btn btn-lime" id="twBtn" href="#" target="_blank" rel="noopener">Follow on X</a>
+        </div>
+      </div>
+
+      <div class="steps rv">
+        <div class="step glass"><div class="n-ico" aria-hidden="true">🏹</div>
+          <div><h4>Built on Robinhood Chain</h4>
+            <p>Chain 4663. Uniswap v2, v3, v4 and UniswapX are all live here, and $ROBIN
+               trades in a V4 pool with a permanently locked position.</p></div></div>
+        <div class="step glass"><div class="n-ico" aria-hidden="true">🔒</div>
+          <div><h4>Nothing to rug</h4>
+            <p>Fixed supply from a CREATE2 factory. No mint, no owner privileges, no
+               upgradeable proxy. Read the contract yourself — we'd rather you did.</p></div></div>
+        <div class="step glass"><div class="n-ico" aria-hidden="true">📈</div>
+          <div><h4>Shopping.io playbook</h4>
+            <p>Same team, same approach that worked last cycle: ship real product, keep the
+               community close, let the chart follow the work.</p></div></div>
+        <div class="step glass"><div class="n-ico" aria-hidden="true">🤝</div>
+          <div><h4>Blessed by the source</h4>
+            <p>30% of supply lives with Dogecoin's co-creator. That's not a partnership
+               announcement — that's an on-chain transfer you can verify.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ faq ── -->
+<section class="sec dark" id="faq" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow">Questions</span>
+      <h2 class="sec-title">Straight answers.</h2>
+    </div>
+    <div class="faq rv">
+      <details class="q glass"><summary>What is Robinhood Chain?</summary>
+        <div class="a">An EVM chain built by Robinhood, chain ID <b>4663</b>, with gas paid in ETH.
+          Add it to any wallet with RPC <code>https://rpc.mainnet.chain.robinhood.com</code>, or just
+          press Connect above and this site will add it for you.</div></details>
+      <details class="q glass"><summary>How do I buy $ROBIN?</summary>
+        <div class="a">Bridge a little ETH to Robinhood Chain, connect your wallet, and use the swap
+          panel. You can also trade on <a href="#" id="faqPons" target="_blank" rel="noopener">Pons</a>
+          or any Uniswap front-end on chain 4663. Only ever use the contract address shown in the header.</div></details>
+      <details class="q glass"><summary>Is the liquidity locked?</summary>
+        <div class="a">Yes. $ROBIN graduated off the Pons bonding curve into a Uniswap V4 pool whose
+          position is permanently locked and governed by the Pons shared hook. The LP cannot be
+          withdrawn by the team or anyone else.</div></details>
+      <details class="q glass"><summary>Did Billy Markus really get 30%?</summary>
+        <div class="a">He did — sent from us, unprompted, with nothing asked in return. It's a plain
+          ERC-20 transfer, so you don't have to take our word for it:
+          <a href="#" id="faqScan" target="_blank" rel="noopener">check the explorer</a>.</div></details>
+      <details class="q glass"><summary>Can the supply change?</summary>
+        <div class="a">No. The Pons factory mints a fixed one billion at deploy and there is no mint
+          function afterwards. What exists today is all there will ever be.</div></details>
+      <details class="q glass"><summary>What does the AI actually do?</summary>
+        <div class="a">It reads the same live market data this page shows and answers questions about
+          the token, the chain and how to trade it. Your OpenRouter key stays on the server — the
+          browser only ever talks to your own <code>api/ai</code> endpoint.</div></details>
+      <details class="q glass"><summary>Is this financial advice?</summary>
+        <div class="a">Absolutely not. $ROBIN is a memecoin with no roadmap promises and no expectation
+          of profit. Prices go to zero all the time. Only ever risk what you'd shrug off losing.</div></details>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ footer ── -->
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="#top" style="color:var(--text-inv)">
+          <img src="assets/img/robin-logo.png" alt="" width="38" height="38"
+               onerror="this.onerror=null;this.src='assets/img/robin-logo.svg'">
+          <span>$ROBIN</span>
+        </a>
+        <p class="about">Robin Nakamoto — the memecoin native to Robinhood Chain.
+          Built by the Shopping.io team. Steal from the charts, give to the holders.</p>
+      </div>
+      <div>
+        <h5>Trade</h5>
+        <ul>
+          <li><a href="#swap">Swap on this page</a></li>
+          <li><a href="#" id="fDex" target="_blank" rel="noopener">DexScreener chart</a></li>
+          <li><a href="#" id="fPons" target="_blank" rel="noopener">Pons launchpad</a></li>
+          <li><a href="#" id="fScan" target="_blank" rel="noopener">Contract on explorer</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Community</h5>
+        <ul>
+          <li><a href="#" id="fTw" target="_blank" rel="noopener">X / Twitter</a></li>
+          <li><a href="#" id="fTg" target="_blank" rel="noopener">Telegram</a></li>
+          <li><a href="#" id="fGh" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="disclaimer">
+      <b>Disclaimer.</b> $ROBIN is a meme token created for entertainment. It is not an investment
+      product, carries no promise of return, and its value may go to zero. Nothing on this page is
+      financial advice. Verify the contract address independently before transacting, and never risk
+      more than you can afford to lose. This site is non-custodial — it never has access to your keys
+      or funds.
+    </div>
+
+    <div class="foot-bot">
+      <span>© <span id="yr"></span> $ROBIN · Robin Nakamoto. Not affiliated with Robinhood Markets, Inc.</span>
+      <span class="mono" id="fCa" style="font-family:var(--font-mono)"></span>
+    </div>
+  </div>
+</footer>
+
+<div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/keccak.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/market.js"></script>
+<script src="assets/js/wallet.js"></script>
+<script src="assets/js/swap.js"></script>
+<script src="assets/js/feed.js"></script>
+<script src="assets/js/ai.js"></script>
+</body>
+</html>

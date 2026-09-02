@@ -1,0 +1,15 @@
+{
+  "name": "robin-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "$ROBIN — Robin Nakamoto. Static site for shopping.io/robin.",
+  "scripts": {
+    "test": "node test/abi.test.js && node test/smoke.test.js",
+    "preview": "node build-preview.js && node test/preview.test.js preview.html",
+    "package": "bash package.sh"
+  },
+  "devDependencies": {
+    "ethers": "^6.17.0",
+    "jsdom": "^27.0.0"
+  }
+}
