@@ -214,7 +214,7 @@
   /* ------------------------------------------------------------ tokenomics */
   var tok = $('#tokList');
   tok.innerHTML = C.distribution.map(function (d) {
-    return '<div class="tok-item glass' + (d.accent ? ' accent' : '') + '">' +
+    return '<div class="tok-item lg lg-d' + (d.accent ? ' accent' : '') + '">' +
              '<div class="tok-top"><span class="lbl">' + esc(d.label) + '</span>' +
              '<span class="pct">' + d.pct + '%</span></div>' +
              '<p>' + esc(d.note) + '</p>' +

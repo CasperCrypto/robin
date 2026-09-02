@@ -30,15 +30,6 @@
 </head>
 <body>
 
-<!-- refraction filter used by the liquid-glass chips -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-  <filter id="refract">
-    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.014" numOctaves="2" seed="7" result="n"/>
-    <feGaussianBlur in="n" stdDeviation="3" result="nb"/>
-    <feDisplacementMap in="SourceGraphic" in2="nb" scale="14" xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-</svg>
-
 <!-- ══════════════════════════════════════════════════════════════ nav ── -->
 <header class="nav" id="nav">
   <div class="wrap">
@@ -66,23 +57,46 @@
 
 <!-- ═════════════════════════════════════════════════════════════ hero ── -->
 <section class="hero" id="top">
-  <div class="hero-bg" aria-hidden="true">
-    <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="grid"></div>
-  </div>
   <div class="wrap">
     <div class="hero-grid">
+
+      <div class="hero-art enter enter-1">
+        <div class="ring">
+          <picture>
+            <source srcset="assets/img/robin-logo.webp" type="image/webp">
+            <img src="assets/img/robin-logo.png" width="512" height="512"
+                 fetchpriority="high" decoding="async"
+                 alt="Robin Nakamoto, a Shiba Inu in a green Robin Hood hat">
+          </picture>
+        </div>
+      </div>
+
       <div class="hero-copy">
-        <span class="eyebrow">🏹 Live on Robinhood Chain · #4663</span>
-        <h1 class="chrome" data-text="$ROBIN">$ROBIN</h1>
-        <p class="tagline">Robin Nakamoto — steal from the charts,<br>give to the holders.</p>
-        <p class="lede">
+        <span class="eyebrow enter enter-2">Live on Robinhood Chain &middot; 4663</span>
+
+        <h1 class="wordmark enter enter-3" data-text="$ROBIN">
+          <span class="wm-glow" aria-hidden="true">$ROBIN</span>
+          <span class="wm-body">$ROBIN</span>
+          <span class="wm-spec" aria-hidden="true">$ROBIN</span>
+        </h1>
+
+        <p class="tagline enter enter-4">Robin Nakamoto</p>
+        <p class="motto enter enter-4">Steal from the charts, give to the holders.</p>
+
+        <p class="lede enter enter-4">
           The memecoin native to <b>Robinhood Chain</b>, with
           <b>30% of supply gifted to Billy Markus</b> — the man who made Dogecoin.<span class="lede-more">
           Launched through the Pons bonding curve and graduated into a permanently
           locked Uniswap&nbsp;V4 pool.</span>
         </p>
 
-        <div class="hero-actions">
+        <div class="pricechip lg enter enter-5" id="priceChip">
+          <i class="pc-dot" aria-hidden="true"></i>
+          <span class="pc-v" id="pcPrice"><span class="skel"></span></span>
+          <span class="pc-d" id="pcChange"></span>
+        </div>
+
+        <div class="hero-actions enter enter-5">
           <a class="btn btn-dark btn-lg" href="#swap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5-5 5 5M12 5v14"/></svg>
             Buy $ROBIN
@@ -93,7 +107,7 @@
           </a>
         </div>
 
-        <div class="ca lens" title="Official contract address">
+        <div class="ca lg enter enter-6" title="Official contract address">
           <span class="ca-label">Contract</span>
           <span class="ca-val" id="caVal"><span class="ca-full"></span><span class="ca-short"></span></span>
           <button class="ca-copy" id="caCopy" type="button" aria-label="Copy contract address">
@@ -101,26 +115,14 @@
           </button>
         </div>
       </div>
-
-      <div class="hero-art">
-        <picture>
-          <source srcset="assets/img/robin-logo.webp" type="image/webp">
-          <img class="doge" src="assets/img/robin-logo.png" width="512" height="512"
-               fetchpriority="high" decoding="async"
-               alt="Robin Nakamoto — a Shiba Inu in a green Robin Hood hat and black glasses">
-        </picture>
-        <div class="badge lens badge-a">🏹 100% locked LP</div>
-        <div class="badge lens badge-b">🐕 30% → Billy</div>
-      </div>
     </div>
 
-    <!-- live market strip -->
-    <div class="stats" id="stats">
-      <div class="stat"><div class="k">Price</div><div class="v" id="sPrice"><span class="skel"></span></div></div>
-      <div class="stat"><div class="k">24h</div><div class="v" id="sChange"><span class="skel"></span></div></div>
-      <div class="stat"><div class="k">Market cap</div><div class="v" id="sMcap"><span class="skel"></span></div></div>
-      <div class="stat"><div class="k">24h volume</div><div class="v" id="sVol"><span class="skel"></span></div></div>
-      <div class="stat"><div class="k">Liquidity</div><div class="v" id="sLiq"><span class="skel"></span></div></div>
+    <div class="stats enter enter-6" id="stats">
+      <div class="stat lg"><div class="k">Price</div><div class="v" id="sPrice"><span class="skel"></span></div></div>
+      <div class="stat lg"><div class="k">24h</div><div class="v" id="sChange"><span class="skel"></span></div></div>
+      <div class="stat lg"><div class="k">Market cap</div><div class="v" id="sMcap"><span class="skel"></span></div></div>
+      <div class="stat lg"><div class="k">24h volume</div><div class="v" id="sVol"><span class="skel"></span></div></div>
+      <div class="stat lg"><div class="k">Liquidity</div><div class="v" id="sLiq"><span class="skel"></span></div></div>
     </div>
   </div>
 </section>
@@ -143,19 +145,19 @@
     <div class="swap-layout">
       <!-- how to buy -->
       <div class="steps rv">
-        <div class="step glass">
+        <div class="step lg lg-d">
           <div class="n">1</div>
           <div><h4>Get onto Robinhood Chain</h4>
             <p>Any EVM wallet works — MetaMask, Rabby, Coinbase Wallet. Hit connect and the
                site adds <b>Robinhood Chain (4663)</b> for you. Gas is paid in ETH.</p></div>
         </div>
-        <div class="step glass">
+        <div class="step lg lg-d">
           <div class="n">2</div>
           <div><h4>Bridge a little ETH</h4>
             <p>Bring ETH over with the official Robinhood Chain bridge. A few dollars covers
                gas for a long time — blocks are cheap here.</p></div>
         </div>
-        <div class="step glass">
+        <div class="step lg lg-d">
           <div class="n">3</div>
           <div><h4>Swap ETH → $ROBIN</h4>
             <p>Use the swap panel, or trade straight from
@@ -163,7 +165,7 @@
                <a href="#" id="stepDex" target="_blank" rel="noopener">DexScreener</a>.
                Always check the contract matches the one in the header.</p></div>
         </div>
-        <div class="step glass">
+        <div class="step lg lg-d">
           <div class="n">4</div>
           <div><h4>Hold like an outlaw</h4>
             <p>Liquidity is locked in a Uniswap V4 pool that can't be pulled. The only exit
@@ -172,7 +174,7 @@
       </div>
 
       <!-- swap card -->
-      <div class="swap glass rv" id="swapCard">
+      <div class="swap lg lg-d rv" id="swapCard">
         <div class="swap-head">
           <h3>Swap</h3>
           <span class="swap-net"><i class="dot off" id="netDot"></i><span id="netLabel">Not connected</span></span>
@@ -237,7 +239,7 @@
         Bigger bags get a bigger doge.</p>
     </div>
 
-    <div class="feed glass rv">
+    <div class="feed lg lg-d rv">
       <div class="feed-head">
         <h3><i class="dot" id="feedDot"></i> Live trades</h3>
         <span style="font-size:12.5px;opacity:.62" id="feedMeta">connecting…</span>
@@ -262,7 +264,7 @@
     <div class="tok-grid">
       <div class="tok-list rv" id="tokList"></div>
 
-      <div class="billy glass rv">
+      <div class="billy lg lg-d rv">
         <div class="ring">🐕</div>
         <h3>30% went to Billy Markus</h3>
         <p>We sent nearly a third of the entire supply to <b>Shibetoshi Nakamoto</b> —
@@ -281,7 +283,7 @@
 <!-- ═══════════════════════════════════════════════════════ meme band ── -->
 <section class="sec dark meme-band" id="meme" style="padding-top:0">
   <div class="wrap">
-    <div class="band glass rv">
+    <div class="band lg lg-d rv">
       <div class="band-art">
         <!-- Poster paints instantly; the 6-second loop is fetched only when
              this scrolls into view, and never on a data-saver connection. -->
@@ -328,7 +330,7 @@
       <button class="ai-tab"    data-pane="meme"  role="tab" aria-selected="false">Meme forge</button>
     </div>
 
-    <div class="ai-panel glass rv">
+    <div class="ai-panel lg lg-d rv">
       <!-- chat -->
       <div class="ai-pane on" data-pane="chat">
         <div class="ai-log" id="aiLog"></div>
@@ -374,7 +376,7 @@
     </div>
 
     <div class="social-grid">
-      <div class="tw-embed glass rv" id="twEmbed">
+      <div class="tw-embed lg lg-d rv" id="twEmbed">
         <div class="tw-fallback">
           <div style="font-size:42px;margin-bottom:10px">𝕏</div>
           <p style="margin:0">Loading the latest from the timeline…</p>
@@ -383,19 +385,19 @@
       </div>
 
       <div class="steps rv">
-        <div class="step glass"><div class="n-ico" aria-hidden="true">🏹</div>
+        <div class="step lg lg-d"><div class="n-ico" aria-hidden="true">🏹</div>
           <div><h4>Built on Robinhood Chain</h4>
             <p>Chain 4663. Uniswap v2, v3, v4 and UniswapX are all live here, and $ROBIN
                trades in a V4 pool with a permanently locked position.</p></div></div>
-        <div class="step glass"><div class="n-ico" aria-hidden="true">🔒</div>
+        <div class="step lg lg-d"><div class="n-ico" aria-hidden="true">🔒</div>
           <div><h4>Nothing to rug</h4>
             <p>Fixed supply from a CREATE2 factory. No mint, no owner privileges, no
                upgradeable proxy. Read the contract yourself — we'd rather you did.</p></div></div>
-        <div class="step glass"><div class="n-ico" aria-hidden="true">📈</div>
+        <div class="step lg lg-d"><div class="n-ico" aria-hidden="true">📈</div>
           <div><h4>Shopping.io playbook</h4>
             <p>Same team, same approach that worked last cycle: ship real product, keep the
                community close, let the chart follow the work.</p></div></div>
-        <div class="step glass"><div class="n-ico" aria-hidden="true">🤝</div>
+        <div class="step lg lg-d"><div class="n-ico" aria-hidden="true">🤝</div>
           <div><h4>Blessed by the source</h4>
             <p>30% of supply lives with Dogecoin's co-creator. That's not a partnership
                announcement — that's an on-chain transfer you can verify.</p></div></div>
@@ -412,30 +414,30 @@
       <h2 class="sec-title">Straight answers.</h2>
     </div>
     <div class="faq rv">
-      <details class="q glass"><summary>What is Robinhood Chain?</summary>
+      <details class="q"><summary>What is Robinhood Chain?</summary>
         <div class="a">An EVM chain built by Robinhood, chain ID <b>4663</b>, with gas paid in ETH.
           Add it to any wallet with RPC <code>https://rpc.mainnet.chain.robinhood.com</code>, or just
           press Connect above and this site will add it for you.</div></details>
-      <details class="q glass"><summary>How do I buy $ROBIN?</summary>
+      <details class="q"><summary>How do I buy $ROBIN?</summary>
         <div class="a">Bridge a little ETH to Robinhood Chain, connect your wallet, and use the swap
           panel. You can also trade on <a href="#" id="faqPons" target="_blank" rel="noopener">Pons</a>
           or any Uniswap front-end on chain 4663. Only ever use the contract address shown in the header.</div></details>
-      <details class="q glass"><summary>Is the liquidity locked?</summary>
+      <details class="q"><summary>Is the liquidity locked?</summary>
         <div class="a">Yes. $ROBIN graduated off the Pons bonding curve into a Uniswap V4 pool whose
           position is permanently locked and governed by the Pons shared hook. The LP cannot be
           withdrawn by the team or anyone else.</div></details>
-      <details class="q glass"><summary>Did Billy Markus really get 30%?</summary>
+      <details class="q"><summary>Did Billy Markus really get 30%?</summary>
         <div class="a">He did — sent from us, unprompted, with nothing asked in return. It's a plain
           ERC-20 transfer, so you don't have to take our word for it:
           <a href="#" id="faqScan" target="_blank" rel="noopener">check the explorer</a>.</div></details>
-      <details class="q glass"><summary>Can the supply change?</summary>
+      <details class="q"><summary>Can the supply change?</summary>
         <div class="a">No. The Pons factory mints a fixed one billion at deploy and there is no mint
           function afterwards. What exists today is all there will ever be.</div></details>
-      <details class="q glass"><summary>What does the AI actually do?</summary>
+      <details class="q"><summary>What does the AI actually do?</summary>
         <div class="a">It reads the same live market data this page shows and answers questions about
           the token, the chain and how to trade it. Your OpenRouter key stays on the server — the
           browser only ever talks to your own <code>api/ai</code> endpoint.</div></details>
-      <details class="q glass"><summary>Is this financial advice?</summary>
+      <details class="q"><summary>Is this financial advice?</summary>
         <div class="a">Absolutely not. $ROBIN is a memecoin with no roadmap promises and no expectation
           of profit. Prices go to zero all the time. Only ever risk what you'd shrug off losing.</div></details>
     </div>

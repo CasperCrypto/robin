@@ -174,13 +174,24 @@
     else paint('change', els.change, (ch >= 0 ? '+' : '') + Number(ch).toFixed(1) + '%',
                ch >= 0 ? 'up' : 'down');
 
-    // mirror price into the sticky mobile buy bar
+    // mirror price into the hero chip and the sticky mobile buy bar
+    var pretty = RB.usd(state.priceUsd);
+    var delta  = (ch == null || isNaN(ch)) ? null
+               : (ch >= 0 ? '+' : '') + Number(ch).toFixed(1) + '%';
+
+    var pcV = document.getElementById('pcPrice');
+    var pcD = document.getElementById('pcChange');
+    if (pcV) pcV.textContent = pretty;
+    if (pcD) {
+      pcD.textContent = delta || '';
+      pcD.className = 'pc-d' + (delta ? (ch >= 0 ? ' up' : ' down') : '');
+    }
+
     var bb = document.getElementById('bbPrice');
     if (bb) {
-      var d = (ch == null || isNaN(ch)) ? ''
-        : ' <span class="d ' + (ch >= 0 ? 'up' : 'down') + '">' +
-          (ch >= 0 ? '+' : '') + Number(ch).toFixed(1) + '%</span>';
-      bb.innerHTML = RB.esc(RB.usd(state.priceUsd)) + d;
+      bb.innerHTML = RB.esc(pretty) + (delta
+        ? ' <span class="d ' + (ch >= 0 ? 'up' : 'down') + '">' + RB.esc(delta) + '</span>'
+        : '');
     }
 
     paint('mcap', els.mcap, RB.usd(state.mcap));
