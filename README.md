@@ -125,9 +125,14 @@ dominant participant in a window of recent transfers, then treats tokens
 shown** — set `market.showSells: true` if you ever want them. Bigger buys get a
 bigger animal. Pin the pool with `market.poolContract` to skip the detection.
 
-The last 25 buys are kept in the visitor's own browser, so the feed still has
-history after a reload or a quiet hour — the chain only serves a limited log
-window, and without this the section would look empty on a slow day.
+Finding them is a search, not a single query: the feed walks backwards from the
+head in windows — up to 20 of them, within a 20-second budget — until it has
+enough buys to fill the section. A single window was not enough, because an RPC
+that refuses a wide query leaves you with a few hundred blocks, and a few
+hundred quiet blocks means an empty feed.
+
+The last 25 are also kept in the visitor's own browser, so history survives a
+reload or a quiet hour, and once buys are on screen they stay there.
 `market.feedRows` sets how many are displayed.
 
 **Connect wallet** — a picker rather than a guess, in up to three groups:

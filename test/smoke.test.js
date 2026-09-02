@@ -59,9 +59,27 @@ win.fetch = (url, opts) => {
       blockNumber: '0x' + (1234560 + i).toString(16),
     }));
 
+    // The chain is quiet near the head: these buys sit ~20k blocks back, so the
+    // feed only finds them if it keeps walking backwards. A single window
+    // returns nothing — that was the "times out and shows nothing" bug.
+    const HEAD = 1234567;
+    const OLD_FROM = HEAD - 22000, OLD_TO = HEAD - 20000;
+    LOGS.forEach((l, i) => { l.blockNumber = '0x' + (OLD_FROM + i).toString(16); });
+
+    let logsServed = 0;
+    const logsFor = (params) => {
+      if (!params || !params[0] || !params[0].fromBlock) return [];
+      const from = parseInt(params[0].fromBlock, 16);
+      const to = parseInt(params[0].toBlock, 16);
+      const hit = from <= OLD_TO && to >= OLD_FROM;
+      if (hit) logsServed++;
+      return hit ? LOGS : [];
+    };
+    global.__logsServed = () => logsServed;
+
     const results = {
-      eth_blockNumber: '0x' + (1234567).toString(16),
-      eth_getLogs: LOGS,
+      eth_blockNumber: '0x' + HEAD.toString(16),
+      eth_getLogs: logsFor(body.params),
       eth_call: '0x' + (10n ** 27n).toString(16).padStart(64, '0'), // totalSupply = 1e9 * 1e18
     };
     return Promise.resolve({
@@ -130,8 +148,9 @@ setTimeout(() => {
   check('sticky buy bar present', !!d.querySelector('#buybar'));
   check('feed is buys only by default', win.ROBIN.market.showSells === false);
   // The stub served 4 buys and 2 sells; only the buys may reach the DOM.
-  check('renders exactly the 4 buys', d.querySelectorAll('#feedList .buy').length === 4,
-    'got ' + d.querySelectorAll('#feedList .buy').length);
+  check('finds buys that are far behind the head',
+    d.querySelectorAll('#feedList .buy').length === 4,
+    'got ' + d.querySelectorAll('#feedList .buy').length + ' (needs to scan back ~20k blocks)');
   check('drops the 2 sells', d.querySelectorAll('#feedList .buy.sell').length === 0);
   check('no minus signs in a buys-only feed',
     !/[\u2212-]\s*[\d]/.test(d.querySelector('#feedList')?.textContent || ''));

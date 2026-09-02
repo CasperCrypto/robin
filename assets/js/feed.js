@@ -30,7 +30,8 @@
     lastBlock: null,
     seen: {},            // txHash+logIndex -> true
     rows: [],
-    range: 6000,         // adaptive: shrinks if the RPC rejects wide queries
+    range: 6000,         // adaptive: halves per query if the RPC refuses it
+    painted: false,      // true once real buys have been rendered
     stopped: false
   };
 
@@ -70,13 +71,19 @@
     }]);
   }
 
-  /** Widest window this RPC will actually serve, found by halving on failure. */
-  function getLogsAdaptive(from, to) {
-    return getLogs(from, to).catch(function (e) {
-      if (S.range > 200) {
-        S.range = Math.floor(S.range / 2);
-        return getLogsAdaptive(Math.max(from, to - S.range), to);
-      }
+  /**
+   * Widest window this RPC will actually serve, found by halving on failure.
+   * The working width is remembered so later queries start there, but it is
+   * never allowed to collapse permanently — a single refused query used to
+   * shrink every subsequent one for the life of the page.
+   */
+  function getLogsAdaptive(from, to, width) {
+    width = width || S.range;
+    return getLogs(Math.max(0, to - width), to).then(function (logs) {
+      S.range = Math.max(S.range, width);
+      return logs;
+    }, function (e) {
+      if (width > 200) return getLogsAdaptive(from, to, Math.floor(width / 2));
       throw e;
     });
   }
@@ -133,9 +140,14 @@
 
   function render() {
     if (!S.rows.length) {
-      listEl.innerHTML = '<div class="feed-empty">Watching the chain for the next buy…</div>';
+      // Only ever show the empty state before anything has arrived. Once buys
+      // are on screen they stay on screen.
+      if (!S.painted) {
+        listEl.innerHTML = '<div class="feed-empty">Watching the chain for the next buy…</div>';
+      }
       return;
     }
+    S.painted = true;
     var price = RB.market.state.priceUsd;
     listEl.innerHTML = S.rows.slice(0, SHOW).map(function (r) {
       var usd = price ? r.amount * price : null;
@@ -158,7 +170,14 @@
       var key = l.transactionHash + ':' + l.logIndex;
       if (S.seen[key]) return;
       var row = toRow(l);
-      if (!row) { S.seen[key] = true; return; }
+      if (!row) {
+        // Only remember it as handled once we could actually judge it. While
+        // the pool is still unknown every log looks unclassifiable, and
+        // marking those seen would discard them for good — the feed would then
+        // stay empty even after the pool was identified.
+        if (S.pool) S.seen[key] = true;
+        return;
+      }
       S.seen[key] = true;
       S.rows.unshift(row);
       added++;
@@ -184,18 +203,61 @@
   }
 
   /* ------------------------------------------------------------ lifecycle */
+  /**
+   * Walk backwards from the head in windows until we have enough buys to fill
+   * the feed, or run out of patience.
+   *
+   * A single window was the bug behind "it times out and shows nothing": if
+   * the RPC refused a wide query the window shrank to a couple of hundred
+   * blocks, and a couple of hundred quiet blocks meant no logs, no pool
+   * detection and an empty feed for good.
+   */
+  var MAX_CHUNKS = 20;        // windows to walk before giving up
+  var SCAN_BUDGET_MS = 20000; // …and a wall-clock ceiling, so a slow RPC
+                              //    cannot leave the section spinning
+
+  function countBuys() {
+    return S.rows.filter(function (r) { return r.buy; }).length;
+  }
+
+  function scanBack(head) {
+    var pending = [];
+    var until = Date.now() + SCAN_BUDGET_MS;
+
+    var step = function (i) {
+      var to = head - i * S.range;
+      if (i >= MAX_CHUNKS || to <= 0 || Date.now() > until) return Promise.resolve();
+
+      return getLogsAdaptive(0, to).then(function (logs) {
+        pending = pending.concat(logs);
+
+        // More log history makes the pool easier to identify with confidence.
+        if (!S.pool) S.pool = detectPool(pending);
+
+        if (S.pool) {
+          ingest(pending, false);
+          pending = [];
+          if (countBuys() >= SHOW) return;     // enough to fill the feed
+        }
+        return step(i + 1);
+      }, function () {
+        // RPC gave up on this window; keep whatever we already have.
+        if (S.pool && pending.length) { ingest(pending, false); pending = []; }
+      });
+    };
+
+    return step(0);
+  }
+
   function backfill() {
     return RB.rpc('eth_blockNumber').then(function (bn) {
       var head = parseInt(bn, 16);
-      var from = Math.max(0, head - S.range);
-      return getLogsAdaptive(from, head).then(function (logs) {
-        S.lastBlock = head;
-        if (!S.pool) S.pool = detectPool(logs);
+      S.lastBlock = head;
+      return scanBack(head).then(function () {
         if (!S.pool) {
-          meta('waiting for pool activity', false);
+          meta(S.rows.length ? 'showing saved buys' : 'waiting for pool activity', false);
           return;
         }
-        ingest(logs, false);
         meta('live · pool ' + RB.shortAddr(S.pool), true);
         render();
       });
