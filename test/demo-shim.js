@@ -8,10 +8,12 @@
     pairAddress: '0x7d8a56584434d8355b891da0ff62d9168669f87dd9c8ad77f6c8fb0a6b6eb7d7',
     baseToken:  { address: '0x280413fbF06CcC1114094A5967dB2191d49EE75e', symbol: 'ROBIN' },
     quoteToken: { address: '0x0000000000000000000000000000000000000000', symbol: 'ETH' },
-    priceUsd: '0.00042137', priceNative: '0.000000112',
-    priceChange: { h24: 18.4 }, volume: { h24: 128450 },
-    liquidity: { usd: 96200 }, marketCap: 421370, fdv: 421370,
-    txns: { h24: { buys: 214, sells: 97 } }
+    // Roughly where $ROBIN actually sits, so the preview is not misleading.
+    // The live site ignores all of this and reads DexScreener directly.
+    priceUsd: '0.00007012', priceNative: '0.0000000234',
+    priceChange: { h24: 12.6 }, volume: { h24: 38400 },
+    liquidity: { usd: 24800 }, marketCap: 70120, fdv: 70120,
+    txns: { h24: { buys: 143, sells: 88 } }
   };
   var POOL = '0x7d8a56584434d8355b891da0ff62d9168669f87dd9c8ad77f6c8fb0a6b6eb7d7'.slice(0,42);
   var TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';

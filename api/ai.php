@@ -322,6 +322,14 @@ if ($code !== 200) {
 // ── pull the image out of the response ────────────────────────────────────
 $url = extractImage($j);
 
+// Only ever return something that is definitely an image. The response is
+// third-party text; a javascript: or data:text/html URL would end up in an
+// <a href> on the page.
+if ($url !== null && !preg_match('#^(data:image/[a-z.+-]+;base64,|https://)#i', $url)) {
+    error_log('[robin-forge] refusing unexpected image URL scheme');
+    $url = null;
+}
+
 if (!$url) {
     // The model answered with words instead of a picture — usually the wrong model.
     $said = is_string($msg['content'] ?? null) ? trim($msg['content']) : '';

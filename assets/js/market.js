@@ -162,7 +162,10 @@
     state.pair        = p;
     state.priceUsd    = parseFloat(p.priceUsd) || null;
     state.priceNative = parseFloat(p.priceNative) || null;
-    state.mcap        = p.marketCap || p.fdv || null;
+    // Prefer the real market cap; only fall back to FDV when it is absent,
+    // not merely zero.
+    state.mcap        = (p.marketCap != null) ? p.marketCap
+                      : (p.fdv != null ? p.fdv : null);
     state.vol24       = (p.volume && p.volume.h24) || 0;
     state.liq         = (p.liquidity && p.liquidity.usd) || 0;
     state.change24    = (p.priceChange && p.priceChange.h24);

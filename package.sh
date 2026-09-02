@@ -6,13 +6,22 @@ cd "$(dirname "$0")"
 rm -rf dist robin-site.zip
 mkdir -p dist
 cp -r index.html assets api README.md dist/
+cp .htaccess dist/
 
-# Ship a starter config for the PHP key, but never a real one.
-cat > dist/api/config.example.php <<'PHP'
+# forge-sample.webp exists only so the offline preview has something to show.
+rm -f dist/assets/img/forge-sample.webp
+
+# Ship the config file ready to edit, never with a key in it.
+cat > dist/api/config.php <<'PHP'
 <?php
-/* Rename to config.php and paste your key. config.php is git-ignored.
-   Prefer a real environment variable (ROBIN_AI_KEY) if your host supports one. */
-return ['ROBIN_AI_KEY' => 'paste-your-key-here'];
+/**
+ * Paste your Concentrate.ai (or other provider) API key between the quotes,
+ * save, and upload. That is the only thing the meme forge needs.
+ *
+ * This file is git-ignored and blocked from the web by .htaccess. If your key
+ * has ever been pasted into a chat, an email or a screenshot, rotate it first.
+ */
+return ['ROBIN_AI_KEY' => ''];
 PHP
 
 ( cd dist && zip -qr ../robin-site.zip . )

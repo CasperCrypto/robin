@@ -27,7 +27,15 @@ const VIEWS = [
     const page = await ctx.newPage();
     const errs = [];
     page.on('pageerror', e => errs.push(e.message));
-    await page.goto('http://127.0.0.1:8899/index.html', { waitUntil: 'load' });
+    // This sandbox has no outbound network, so third-party embeds (the X
+    // timeline, fonts) would hang the load event. Fail them fast instead —
+    // which also proves the page renders fine without them.
+    await page.route('**', (route) => {
+      const u = route.request().url();
+      if (u.startsWith('http://127.0.0.1:8899')) return route.continue();
+      return route.abort();
+    });
+    await page.goto('http://127.0.0.1:8899/index.html', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2200);
 
     const m = await page.evaluate(() => {

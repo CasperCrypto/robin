@@ -28,9 +28,9 @@ setTimeout(() => {
   const check=(n,c,x='')=>{c?pass++:fail++;console.log(`${c?'PASS':'FAIL'}  ${n}${c?'':'  '+x}`);};
 
   check('price shows demo data', t('#sPrice').startsWith('$0.000'), t('#sPrice'));
-  check('24h change shows +18.4%', t('#sChange')==='+18.4%', t('#sChange'));
-  check('mcap shows', t('#sMcap')==='$421.4K', t('#sMcap'));
-  check('liquidity shows', t('#sLiq')==='$96.2K', t('#sLiq'));
+  check('24h change shows +12.6%', t('#sChange')==='+12.6%', t('#sChange'));
+  check('mcap shows realistic sample', t('#sMcap')==='$70.1K', t('#sMcap'));
+  check('liquidity shows', t('#sLiq')==='$24.8K', t('#sLiq'));
   const heroSrc = d.querySelector('.hero-art img')?.getAttribute('src') || '';
   check('hero logo is an inlined raster data URI',
     /^data:image\/(png|webp);base64,/.test(heroSrc), heroSrc.slice(0, 40));
@@ -48,6 +48,7 @@ setTimeout(() => {
   check('swap rate populated', t('#mRate').includes('ROBIN'), t('#mRate'));
   check('supply facts rendered', d.querySelectorAll('#tokList .fact').length===4);
   check('meme forge present', !!d.querySelector('#forgeStage'));
+  check('preview is labelled as sample data', !!d.querySelector('#demoBadge'));
   check('no script errors', errors.length===0, errors.join(' | '));
 
   console.log(`\n${pass} passed, ${fail} failed`);

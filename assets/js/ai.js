@@ -108,6 +108,11 @@
         return r.json().catch(function () { return {}; }).then(function (j) {
           if (!r.ok) throw new Error(j.error || ('Request failed (' + r.status + ')'));
           if (!j.image) throw new Error('No image came back. Try a different scene.');
+          // The value ends up in img.src and an <a href>, so accept image
+          // schemes only — never javascript: or data:text/html.
+          if (!/^(data:image\/[a-z.+-]+;base64,|https:\/\/)/i.test(j.image)) {
+            throw new Error('The image came back in an unexpected format.');
+          }
           return j.image;
         });
       })
