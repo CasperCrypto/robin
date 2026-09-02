@@ -51,9 +51,9 @@ Your 1 MB source PNG became a 25 KB WebP, and the 9.5 MB GIF became a 965 KB
 animated WebP — same 60 frames, same 6-second loop.
 
 **The animation never blocks the page.** The 17 KB poster paints immediately and
-the loop is fetched only when the meme band scrolls into view. Anyone on a
-data-saver connection, a 2G connection, or with "reduce motion" turned on gets a
-Play button instead and downloads nothing until they tap it.
+the loop is fetched only when the meme band scrolls into view, then plays on its
+own. The one exception is a browser explicitly asking to save data (or a 2G
+connection), which gets a Play button rather than an unrequested megabyte.
 
 To swap in different artwork later, replace the files in `assets/img/` keeping
 the same names. `assets/img/` also holds `robin-doge-poster.webp`, which should
@@ -122,9 +122,24 @@ the contract read fails, it falls back to the reported figure.
 RPC. There is no trades API for a V4 pool, so it identifies the pool as the
 dominant participant in a window of recent transfers, then treats tokens
 *leaving* the pool as a buy. **Sells are recognised so they can be excluded, not
-shown** — set `market.showSells: true` in the config if you ever want them.
-Bigger buys get a bigger animal. Pin the pool with `market.poolContract` to skip
-the auto-detection.
+shown** — set `market.showSells: true` if you ever want them. Bigger buys get a
+bigger animal. Pin the pool with `market.poolContract` to skip the detection.
+
+The last 25 buys are kept in the visitor's own browser, so the feed still has
+history after a reload or a quiet hour — the chain only serves a limited log
+window, and without this the section would look empty on a slow day.
+`market.feedRows` sets how many are displayed.
+
+**Connect wallet** — a picker rather than a guess. Wallets that announce
+themselves (EIP-6963) are listed by name and icon; one detected wallet connects
+straight away, several let the visitor choose. On a phone, where wallets are
+apps and nothing is injected, it offers MetaMask, Trust, Coinbase Wallet and
+Phantom — each link reopens the site inside that app's browser, where
+connecting is one tap. iPadOS is detected too, which reports itself as a Mac.
+
+**Swap** — deliberately plain: amount in, amount out, buy. The slippage control
+is hidden because the quote already accounts for the pool fee and there is
+nothing left worth tuning. Set `swap.showSlippage: true` to bring it back.
 
 **Swap panel** — connects any EVM wallet, adds Robinhood Chain (4663) if the wallet
 doesn't have it, reads real balances, quotes from the live pool and shows minimum
@@ -133,6 +148,11 @@ received at your slippage. See below for the two execution modes.
 **Meme forge** — the one AI feature. Describe a scene, get a picture of Robin in
 it, drawn from your real artwork so the character stays on-model. Download, copy,
 or post straight to X.
+
+**Community** — the X timeline is attempted, but that widget is blocked by many
+privacy extensions and renders nothing for a protected account, so the card
+starts as a proper Follow card and is only replaced once a real timeline
+actually appears. It never sits on "Loading…".
 
 ---
 

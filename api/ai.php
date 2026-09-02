@@ -247,7 +247,10 @@ $prompt = mb_substr(trim((string)($body['prompt'] ?? '')), 0, MAX_PROMPT);
 if ($prompt === '') fail(400, 'Tell it what to draw first.');
 
 $key = apiKey();
-if ($key === '') fail(503, 'The meme forge is not configured yet — set ROBIN_AI_KEY on the server.');
+if ($key === '') {
+    fail(503, 'Robin AI is not switched on yet — the site owner needs to add an API key. '
+            . '(Owner: open api/ai.php?selftest=1 to see exactly what is missing.)');
+}
 
 // count the attempt only once we know we are really going to call out
 $hits[] = $now;

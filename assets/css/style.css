@@ -877,3 +877,71 @@ body.has-buybar .foot{padding-bottom:calc(26px + 70px + env(safe-area-inset-bott
 @media (min-width:940px){
   .forge{grid-template-columns:440px 1fr;gap:32px}
 }
+
+/* ══════════════════════════════════════════════════════════ X follow card */
+.tw-fallback{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;padding:38px 24px;text-align:center;min-height:280px;
+}
+.tw-x{font-size:38px;line-height:1;color:var(--text-inv);opacity:.9}
+.tw-handle{
+  font-family:var(--font-display);font-weight:800;font-size:20px;
+  letter-spacing:-.02em;color:var(--text-inv);margin-top:8px;
+}
+.tw-fallback p{
+  margin:8px 0 0;font-size:14.5px;line-height:1.55;
+  color:var(--text-inv-soft);max-width:32ch;
+}
+.tw-fallback .btn{margin-top:18px}
+.tw-mount{width:100%}
+
+/* ═══════════════════════════════════════════════════════ wallet picker */
+.wsheet{position:fixed;inset:0;z-index:300;display:flex;align-items:flex-end;justify-content:center}
+.wsheet[hidden]{display:none}
+.wsheet-bg{
+  position:absolute;inset:0;background:rgba(4,7,2,.62);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  opacity:0;transition:opacity .24s var(--ease);
+}
+.wsheet.open .wsheet-bg{opacity:1}
+.wsheet-panel{
+  position:relative;width:100%;max-width:440px;
+  padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+  border-radius:var(--r-2xl) var(--r-2xl) 0 0;
+  transform:translateY(14px);opacity:0;
+  transition:transform .28s var(--ease-out),opacity .22s var(--ease-out);
+}
+.wsheet.open .wsheet-panel{transform:none;opacity:1}
+.wsheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.wsheet-head h3{font-size:19px}
+.wsheet-x{
+  width:34px;height:34px;border-radius:11px;display:grid;place-items:center;flex:none;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);color:var(--text-inv-soft);
+}
+.wlist{display:grid;gap:8px}
+.wrow{
+  display:flex;align-items:center;gap:13px;width:100%;text-align:left;
+  padding:13px 14px;border-radius:var(--r-md);
+  background:var(--gd-fill);border:1px solid var(--gd-rim);color:var(--text-inv);
+  transition:background .16s,border-color .16s,transform .12s var(--ease);
+}
+.wrow:active{transform:scale(.985)}
+.wrow-ico{
+  width:38px;height:38px;border-radius:11px;flex:none;display:grid;place-items:center;
+  background:rgba(255,255,255,.07);color:var(--lime-400);overflow:hidden;
+}
+.wrow-ico img{width:100%;height:100%;object-fit:cover;border-radius:11px}
+.wrow-txt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.wrow-txt b{font-size:15.5px;font-weight:700;letter-spacing:-.01em}
+.wrow-txt i{font-style:normal;font-size:12px;color:var(--text-inv-mute)}
+.wrow-go{flex:none;color:var(--text-inv-mute)}
+.wsheet-note{margin:14px 0 0;font-size:12.5px;line-height:1.55;color:var(--text-inv-mute);text-align:center}
+
+@media (hover:hover) and (pointer:fine){
+  .wrow:hover{background:var(--gd-fill-hi);border-color:rgba(168,220,43,.4)}
+  .wsheet-x:hover{color:var(--text-inv)}
+}
+@media (min-width:560px){
+  .wsheet{align-items:center}
+  .wsheet-panel{border-radius:var(--r-2xl);padding:24px;margin:20px}
+}

@@ -42,7 +42,10 @@ window.ROBIN = {
     // the live-buy feed auto-detects it from recent Transfer logs.
     poolContract: '',
     // The feed shows buys only. Set true to show sells alongside them.
-    showSells: false
+    showSells: false,
+    // How many buys to display. The last 25 are remembered in the visitor's
+    // browser so the feed keeps history through reloads and quiet spells.
+    feedRows: 12
   },
 
   /* ----------------------------------------------------------------- swap */
@@ -84,7 +87,11 @@ window.ROBIN = {
      * slippage tolerance would revert. Set it to 0 for an untaxed token. */
     feePct: 4,
 
-    slippageDefault: 2,           // percent, on top of feePct
+    /* Slippage tolerance, on top of feePct. Hidden from the panel by default —
+     * the quote already accounts for the pool fee, so there is nothing here a
+     * visitor needs to think about. Set showSlippage true to expose the picker. */
+    slippageDefault: 2,           // percent
+    showSlippage: false,
     presets:        [0.01, 0.05, 0.1, 0.5]   // quick-buy amounts in ETH
   },
 

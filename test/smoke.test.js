@@ -109,7 +109,8 @@ setTimeout(() => {
     !/30%/.test(d.querySelector('#tokList').textContent));
   check('slippage buttons rendered', d.querySelectorAll('#slip button').length === 4);
   check('preset buttons rendered', d.querySelectorAll('#presets button').length === 4);
-  check('swap CTA reflects no wallet', /wallet/i.test(t('#swapBtn')), t('#swapBtn'));
+  check('swap CTA says connect, never install', t('#swapBtn') === 'Connect wallet', t('#swapBtn'));
+  check('nav button says Connect', t('#navConnect') === 'Connect', t('#navConnect'));
   check('meme forge present', !!d.querySelector('#forgeStage'));
   check('forge starts idle', d.querySelector('#forgeStage')?.dataset.state === 'idle');
   check('forge presets rendered', d.querySelectorAll('#forgeChips button').length === 6);
@@ -135,6 +136,12 @@ setTimeout(() => {
   check('no minus signs in a buys-only feed',
     !/[\u2212-]\s*[\d]/.test(d.querySelector('#feedList')?.textContent || ''));
   check('feed heading says buys', /Live buys/.test(d.querySelector('.feed-head h3')?.textContent || ''));
+  check('slippage row hidden by default',
+    d.querySelector('#slip')?.closest('.row')?.style.display === 'none');
+  check('X follow card rendered without the widget',
+    !!d.querySelector('#twEmbed .tw-fallback') &&
+    /shopping_io/.test(d.querySelector('#twEmbed')?.textContent || ''));
+  check('buy history is remembered', win.ROBIN.market.feedRows === 12);
   check('buy bar shows live price', /\$0\.000/.test(t('#bbPrice')), t('#bbPrice'));
   check('meme band present', !!d.querySelector('#dogeAnim'));
   check('animation is lazy (poster only at rest)',

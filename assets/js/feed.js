@@ -21,14 +21,43 @@
   var TOPIC = RB.ERC20.TRANSFER_TOPIC;
   var ZERO = '0x0000000000000000000000000000000000000000';
 
+  var STORE_KEY = 'robin.buys.v1';
+  var KEEP = 25;                      // remembered
+  var SHOW = Number(C.market.feedRows) || 12;   // rendered
+
   var S = {
     pool: (C.market.poolContract || '').toLowerCase() || null,
     lastBlock: null,
     seen: {},            // txHash+logIndex -> true
     rows: [],
-    range: 2000,         // adaptive: shrinks if the RPC rejects wide queries
+    range: 6000,         // adaptive: shrinks if the RPC rejects wide queries
     stopped: false
   };
+
+  /* The chain only keeps a usable log window, and a quiet hour would leave the
+     feed empty even though buys did happen. Remember the recent ones locally so
+     the section always has history to show. */
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var saved = JSON.parse(raw);
+      if (!Array.isArray(saved)) return;
+      saved.forEach(function (r) {
+        if (!r || !r.id || !r.amount) return;
+        S.seen[r.id] = true;
+        S.rows.push(r);
+      });
+      S.rows.sort(function (a, b) { return (b.block || 0) - (a.block || 0); });
+      S.rows = S.rows.slice(0, KEEP);
+    } catch (e) { /* private mode, quota, corrupt value — carry on empty */ }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(S.rows.slice(0, KEEP)));
+    } catch (e) { /* storage unavailable; the feed still works in memory */ }
+  }
 
   function topicAddr(t) { return '0x' + String(t).slice(-40).toLowerCase(); }
 
@@ -108,7 +137,7 @@
       return;
     }
     var price = RB.market.state.priceUsd;
-    listEl.innerHTML = S.rows.slice(0, 40).map(function (r) {
+    listEl.innerHTML = S.rows.slice(0, SHOW).map(function (r) {
       var usd = price ? r.amount * price : null;
       return '<div class="buy' + (r.buy ? '' : ' sell') + '">' +
         '<div class="emo">' + emoji(usd, r.buy) + '</div>' +
@@ -140,8 +169,12 @@
                  'ok', { href: RB.scan('tx', row.tx), text: 'View' });
       }
     });
-    S.rows = S.rows.slice(0, 60);
-    if (added) render();
+    if (added) {
+      S.rows.sort(function (a, b) { return (b.block || 0) - (a.block || 0); });
+      S.rows = S.rows.slice(0, KEEP);
+      save();
+      render();
+    }
     return added;
   }
 
@@ -187,12 +220,17 @@
     }).catch(function () { /* transient RPC hiccup; next tick retries */ });
   }
 
-  meta('connecting…', false);
+  load();
+  if (S.rows.length) { render(); meta('showing recent buys', false); }
+  else { meta('connecting…', false); }
+
   backfill().catch(function () {
-    meta('chain unreachable', false);
-    listEl.innerHTML = '<div class="feed-empty">Could not reach the Robinhood Chain RPC from this browser.<br>' +
-      'The chart and swap still work — <a href="' + RB.esc(C.links.dexscreener) +
-      '" target="_blank" rel="noopener" style="color:var(--lime-400)">open DexScreener</a>.</div>';
+    meta(S.rows.length ? 'showing saved buys' : 'chain unreachable', false);
+    if (!S.rows.length) {
+      listEl.innerHTML = '<div class="feed-empty">Could not reach the Robinhood Chain RPC from this browser.<br>' +
+        'The chart and swap still work — <a href="' + RB.esc(C.links.dexscreener) +
+        '" target="_blank" rel="noopener" style="color:var(--lime-400)">open DexScreener</a>.</div>';
+    }
   });
 
   setInterval(poll, 12000);

@@ -91,7 +91,11 @@ export default async function handler(req, res) {
   if (rateLimited(ip)) return json(429, { error: 'That is a lot of memes. Give it a couple of minutes.' });
 
   const key = process.env.ROBIN_AI_KEY || process.env.OPENROUTER_API_KEY;
-  if (!key) return json(503, { error: 'The meme forge is not configured yet — set ROBIN_AI_KEY.' });
+  if (!key) {
+    return json(503, {
+      error: 'Robin AI is not switched on yet — the site owner needs to add an API key.',
+    });
+  }
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = null; } }

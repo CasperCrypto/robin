@@ -11,29 +11,87 @@
   function emit() { listeners.forEach(function (fn) { try { fn(state); } catch (e) {} }); }
 
   /* ------------------------------------------------------ provider lookup */
-  // EIP-6963 announces providers on an event; keep whatever shows up so users
-  // with several wallets installed still get a working button.
-  var discovered = [];
-  window.addEventListener('eip6963:announceProvider', function (e) {
-    if (e.detail && e.detail.provider && discovered.indexOf(e.detail.provider) === -1) {
-      discovered.push(e.detail.provider);
-    }
-  });
-  try { window.dispatchEvent(new Event('eip6963:requestProvider')); } catch (e) {}
+  /*
+     EIP-6963 is how modern wallets announce themselves: each one fires an
+     event carrying its name, icon and a provider object. That is what lets us
+     show a real picker instead of guessing at window.ethereum, which only ever
+     holds whichever extension won the race to inject.
+  */
+  var detected = [];          // [{ info:{name,icon,rdns}, provider }]
 
-  function findProvider() {
-    var eth = window.ethereum;
-    if (eth) {
-      // Some wallets expose siblings under .providers — prefer a real one.
-      if (Array.isArray(eth.providers) && eth.providers.length) {
-        return eth.providers.find(function (p) { return p.isMetaMask; }) || eth.providers[0];
-      }
-      return eth;
+  function addDetail(d) {
+    if (!d || !d.provider || !d.info) return;
+    for (var i = 0; i < detected.length; i++) {
+      if (detected[i].info.rdns === d.info.rdns) return;
     }
-    return discovered[0] || null;
+    detected.push(d);
   }
 
-  function hasWallet() { return !!findProvider(); }
+  window.addEventListener('eip6963:announceProvider', function (e) { addDetail(e.detail); });
+  try { window.dispatchEvent(new Event('eip6963:requestProvider')); } catch (e) {}
+
+  /** Anything injected the old way, for wallets that predate EIP-6963. */
+  function legacyProviders() {
+    var eth = window.ethereum;
+    if (!eth) return [];
+    var list = (Array.isArray(eth.providers) && eth.providers.length) ? eth.providers : [eth];
+    return list.map(function (p) {
+      var name = p.isMetaMask ? 'MetaMask'
+               : p.isCoinbaseWallet ? 'Coinbase Wallet'
+               : p.isTrust || p.isTrustWallet ? 'Trust Wallet'
+               : p.isPhantom ? 'Phantom'
+               : p.isRabby ? 'Rabby'
+               : p.isBraveWallet ? 'Brave Wallet'
+               : 'Browser wallet';
+      return { info: { name: name, rdns: 'legacy.' + name, icon: '' }, provider: p };
+    });
+  }
+
+  /** Everything we could connect to right now, de-duplicated by name. */
+  function available() {
+    var all = detected.slice();
+    legacyProviders().forEach(function (l) {
+      var dup = all.some(function (d) { return d.info.name === l.info.name; });
+      if (!dup) all.push(l);
+    });
+    return all;
+  }
+
+  function hasWallet() { return available().length > 0; }
+
+  function isMobile() {
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')) return true;
+    // iPadOS reports itself as a Mac, so the user agent alone misses it. A
+    // coarse pointer with no hover and real touch points is the giveaway.
+    var coarse = window.matchMedia &&
+                 window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    return !!coarse && (navigator.maxTouchPoints || 0) > 0;
+  }
+
+  /*
+     On a phone, a wallet is an app, not an extension — so there is nothing to
+     inject and nothing to pick. What works is handing the app a link that
+     reopens this page inside its own browser, where its provider IS injected.
+  */
+  function deepLinks() {
+    var full  = window.location.href;
+    var bare  = window.location.host + window.location.pathname + window.location.search;
+    var enc   = encodeURIComponent(full);
+    return [
+      { name: 'MetaMask',        url: 'https://metamask.app.link/dapp/' + bare },
+      { name: 'Trust Wallet',    url: 'https://link.trustwallet.com/open_url?coin_id=60&url=' + enc },
+      { name: 'Coinbase Wallet', url: 'https://go.cb-w.com/dapp?cb_url=' + enc },
+      { name: 'Phantom',         url: 'https://phantom.app/ul/browse/' + enc +
+                                      '?ref=' + encodeURIComponent(window.location.origin) }
+    ];
+  }
+
+  var INSTALL = [
+    { name: 'MetaMask',        url: 'https://metamask.io/download/' },
+    { name: 'Rabby',           url: 'https://rabby.io/' },
+    { name: 'Coinbase Wallet', url: 'https://www.coinbase.com/wallet/downloads' },
+    { name: 'Phantom',         url: 'https://phantom.app/download' }
+  ];
 
   /* ------------------------------------------------------------- chain io */
   var CHAIN_PARAMS = {
@@ -65,26 +123,125 @@
     return state.chainId && parseInt(state.chainId, 16) === C.chain.id;
   }
 
-  /* ------------------------------------------------------------- connect */
-  function connect(silent) {
-    var p = findProvider();
-    if (!p) {
-      if (!silent) {
-        RB.toast('No EVM wallet found — install MetaMask or Rabby', 'err',
-                 { href: 'https://metamask.io/download/', text: 'Get one' });
-      }
-      return Promise.reject(new Error('No wallet'));
+  /* --------------------------------------------------------- picker sheet */
+  var sheet, listEl, noteEl, sheetOpen = false, lastFocus = null;
+
+  function buildSheet() {
+    if (sheet) return;
+    sheet = document.createElement('div');
+    sheet.className = 'wsheet';
+    sheet.id = 'walletSheet';
+    sheet.hidden = true;
+    sheet.innerHTML =
+      '<div class="wsheet-bg" data-close></div>' +
+      '<div class="wsheet-panel lg lg-d" role="dialog" aria-modal="true" aria-label="Connect a wallet">' +
+        '<div class="wsheet-head">' +
+          '<h3>Connect wallet</h3>' +
+          '<button class="wsheet-x" type="button" data-close aria-label="Close">' +
+            '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" ' +
+            'stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div class="wlist"></div>' +
+        '<p class="wsheet-note"></p>' +
+      '</div>';
+    document.body.appendChild(sheet);
+    listEl = sheet.querySelector('.wlist');
+    noteEl = sheet.querySelector('.wsheet-note');
+
+    sheet.addEventListener('click', function (e) {
+      if (e.target.closest('[data-close]')) closeSheet();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && sheetOpen) closeSheet();
+    });
+  }
+
+  function row(label, iconHtml, sub) {
+    return '<span class="wrow-ico">' + iconHtml + '</span>' +
+           '<span class="wrow-txt"><b>' + RB.esc(label) + '</b>' +
+           (sub ? '<i>' + RB.esc(sub) + '</i>' : '') + '</span>' +
+           '<svg class="wrow-go" viewBox="0 0 24 24" width="16" height="16" fill="none" ' +
+           'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M9 6l6 6-6 6"/></svg>';
+  }
+
+  var GENERIC = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.9" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/>' +
+    '<rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="16.5" cy="13" r="1.4"/></svg>';
+
+  function openSheet() {
+    buildSheet();
+    var found = available();
+    listEl.innerHTML = '';
+
+    if (found.length) {
+      found.forEach(function (d) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'wrow';
+        b.innerHTML = row(d.info.name,
+          d.info.icon ? '<img src="' + RB.esc(d.info.icon) + '" alt="" width="22" height="22">' : GENERIC,
+          'Detected');
+        b.addEventListener('click', function () {
+          closeSheet();
+          connectWith(d.provider);
+        });
+        listEl.appendChild(b);
+      });
+      noteEl.textContent = 'Approve the connection in your wallet. This site never sees your keys.';
+    } else if (isMobile()) {
+      deepLinks().forEach(function (w) {
+        var a = document.createElement('a');
+        a.className = 'wrow';
+        a.href = w.url;
+        a.rel = 'noopener';
+        a.innerHTML = row(w.name, GENERIC, 'Opens the app');
+        listEl.appendChild(a);
+      });
+      noteEl.textContent = 'Pick your wallet app — it reopens this page inside it, ' +
+        'where connecting takes one tap.';
+    } else {
+      INSTALL.forEach(function (w) {
+        var a = document.createElement('a');
+        a.className = 'wrow';
+        a.href = w.url;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.innerHTML = row(w.name, GENERIC, 'Install');
+        listEl.appendChild(a);
+      });
+      noteEl.textContent = 'No wallet found in this browser. Install one, then come back ' +
+        'and press Connect.';
     }
+
+    lastFocus = document.activeElement;
+    sheet.hidden = false;
+    requestAnimationFrame(function () { sheet.classList.add('open'); });
+    document.body.style.overflow = 'hidden';
+    sheetOpen = true;
+    var first = listEl.querySelector('.wrow');
+    if (first && first.focus) first.focus();
+  }
+
+  function closeSheet() {
+    if (!sheet) return;
+    sheet.classList.remove('open');
+    sheetOpen = false;
+    document.body.style.overflow = '';
+    setTimeout(function () { if (!sheetOpen) sheet.hidden = true; }, 220);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  /* ------------------------------------------------------------- connect */
+  function connectWith(p) {
+    if (!p) return Promise.reject(new Error('No wallet'));
     if (state.connecting) return Promise.reject(new Error('Already connecting'));
     state.connecting = true;
     state.provider = p;
     bind(p);
 
-    var req = silent
-      ? p.request({ method: 'eth_accounts' })
-      : p.request({ method: 'eth_requestAccounts' });
-
-    return req
+    return p.request({ method: 'eth_requestAccounts' })
       .then(function (accts) {
         if (!accts || !accts.length) throw new Error('No account');
         state.account = accts[0];
@@ -93,24 +250,56 @@
       .then(function (id) {
         state.chainId = id;
         emit();
-        if (!silent && !onChain()) return ensureChain();
+        if (!onChain()) return ensureChain();
       })
       .then(function () {
         state.connecting = false;
         emit();
+        RB.toast('Wallet connected', 'ok');
         return state.account;
       })
       .catch(function (e) {
         state.connecting = false;
         state.account = null;
         emit();
-        if (!silent) {
-          var code = e && e.code;
-          if (code === 4001) RB.toast('Connection rejected', 'err');
-          else if (e.message !== 'No account') RB.toast(e.message || 'Could not connect', 'err');
-        }
+        if (e && e.code === 4001) RB.toast('Connection rejected', 'err');
+        else if (e && e.message !== 'No account') RB.toast(e.message || 'Could not connect', 'err');
         throw e;
       });
+  }
+
+  /**
+   * The entry point behind every Connect button. One wallet connects straight
+   * away; several, or none, opens the picker.
+   */
+  function connect(silent) {
+    if (silent) return reconnect();
+    var found = available();
+    if (found.length === 1) return connectWith(found[0].provider);
+    openSheet();
+    return Promise.reject(new Error('Choosing'));
+  }
+
+  /** Quietly restore a session the wallet already trusts. No prompts. */
+  function reconnect() {
+    var found = available();
+    if (!found.length) return Promise.reject(new Error('No wallet'));
+    var tryOne = function (i) {
+      if (i >= found.length) return Promise.reject(new Error('No account'));
+      var p = found[i].provider;
+      return p.request({ method: 'eth_accounts' }).then(function (a) {
+        if (!a || !a.length) return tryOne(i + 1);
+        state.provider = p;
+        bind(p);
+        state.account = a[0];
+        return p.request({ method: 'eth_chainId' }).then(function (id) {
+          state.chainId = id;
+          emit();
+          return state.account;
+        });
+      }, function () { return tryOne(i + 1); });
+    };
+    return tryOne(0);
   }
 
   var bound = false;
@@ -170,7 +359,7 @@
 
   function paintNav() {
     if (!state.account) {
-      navBtn.textContent = hasWallet() ? 'Connect' : 'Get a wallet';
+      navBtn.textContent = 'Connect';
       navBtn.classList.remove('btn-lime');
       navBtn.classList.add('btn-dark');
       return;
@@ -182,12 +371,12 @@
 
   navBtn.addEventListener('click', function () {
     if (!state.account) {
-      connect(false).then(function () { RB.toast('Wallet connected', 'ok'); }).catch(function () {});
+      connect(false).catch(function () {});
     } else if (!onChain()) {
       ensureChain().then(function () { RB.toast('Switched to Robinhood Chain', 'ok'); })
                    .catch(function () { RB.toast('Could not switch network', 'err'); });
     } else {
-      navigator.clipboard && navigator.clipboard.writeText(state.account);
+      if (navigator.clipboard) navigator.clipboard.writeText(state.account);
       RB.toast('Address copied', 'ok');
     }
   });
@@ -195,13 +384,15 @@
   listeners.push(paintNav);
   paintNav();
 
-  // Reconnect quietly if the wallet already trusts this site.
-  if (hasWallet()) setTimeout(function () { connect(true).catch(function () {}); }, 300);
+  // Reconnect quietly if a wallet already trusts this site. Delayed so
+  // EIP-6963 announcements have landed first.
+  setTimeout(function () { reconnect().catch(function () {}); }, 350);
 
   /* ------------------------------------------------------------- exports */
   window.RB.wallet = {
-    state: state, connect: connect, ensureChain: ensureChain, onChain: onChain,
-    hasWallet: hasWallet, balances: balances, send: send, waitReceipt: waitReceipt,
+    state: state, connect: connect, connectWith: connectWith, ensureChain: ensureChain,
+    onChain: onChain, hasWallet: hasWallet, available: available, isMobile: isMobile,
+    openPicker: openSheet, balances: balances, send: send, waitReceipt: waitReceipt,
     onChange: function (fn) { listeners.push(fn); fn(state); }
   };
 })();

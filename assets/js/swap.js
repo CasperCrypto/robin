@@ -248,7 +248,6 @@
     b.removeAttribute('aria-disabled');
 
     if (S.busy) { b.innerHTML = '<span class="spin"></span> Working…'; b.setAttribute('aria-disabled', 'true'); return; }
-    if (!W.hasWallet()) { b.textContent = 'Install a wallet'; return; }
     if (!W.state.account) { b.textContent = 'Connect wallet'; return; }
     if (!W.onChain()) { b.textContent = 'Switch to Robinhood Chain'; return; }
     if (!amtIn || amtIn <= 0) { b.textContent = 'Enter an amount'; b.setAttribute('aria-disabled', 'true'); return; }
@@ -292,7 +291,11 @@
     render();
   });
 
-  // slippage picker
+  // Slippage picker — hidden unless explicitly enabled, since the quote
+  // already subtracts the pool fee and there is nothing left to tune.
+  var slipRow = el.slip && el.slip.closest('.row');
+  if (!C.swap.showSlippage && slipRow) slipRow.style.display = 'none';
+
   [1, 2, 5, 10].forEach(function (v) {
     var b = document.createElement('button');
     b.type = 'button';
@@ -334,11 +337,8 @@
   el.btn.addEventListener('click', function () {
     if (S.busy || el.btn.getAttribute('aria-disabled') === 'true') return;
 
-    if (!W.hasWallet()) {
-      window.open('https://metamask.io/download/', '_blank', 'noopener');
-      return;
-    }
     if (!W.state.account) {
+      // Opens the picker when there is a choice to make, or no wallet at all.
       W.connect(false).then(function () { refreshBalances(true); }).catch(function () {});
       return;
     }

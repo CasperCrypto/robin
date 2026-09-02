@@ -197,7 +197,7 @@
   var map = {
     '#chartLink': L.dexscreener, '#stepDex': L.dexscreener, '#fDex': L.dexscreener,
     '#stepPons': L.pons, '#faqPons': L.pons, '#fPons': L.pons,
-    '#fTw': L.twitter, '#twBtn': L.twitter,
+    '#fTw': L.twitter,
     '#fTg': L.telegram, '#fGh': L.github,
     '#fScan': scan('token', addr),
     '#billyScan': scan('token', addr) + '?tab=holders',
@@ -254,35 +254,79 @@
   $('#yr').textContent = new Date().getFullYear();
 
   /* -------------------------------------------------- X timeline embed */
+  /*
+     X's widget is loaded from platform.twitter.com and is blocked outright by
+     many privacy extensions, some networks, and any tracking-protection
+     setting. It also renders nothing for a protected or empty account. So the
+     card starts as a proper Follow card and is only replaced once a real
+     timeline iframe actually appears — rather than sitting on "Loading…"
+     forever when it never will.
+  */
   var handle = (C.twitterHandle || '').replace(/^@/, '');
-  if (handle) {
-    var box = $('#twEmbed');
+  var twBox = $('#twEmbed');
+
+  function followCard() {
+    if (!twBox) return;
+    var url = handle ? 'https://x.com/' + handle : (C.links.twitter || '#');
+    twBox.innerHTML =
+      '<div class="tw-fallback">' +
+        '<div class="tw-x" aria-hidden="true">𝕏</div>' +
+        (handle ? '<div class="tw-handle">@' + esc(handle) + '</div>' : '') +
+        '<p>Charts, memes and every announcement first. ' +
+        'Robin posts more than he should.</p>' +
+        '<a class="btn btn-lime" href="' + esc(url) + '" target="_blank" rel="noopener">' +
+          'Follow on X</a>' +
+      '</div>';
+  }
+
+  if (!handle) {
+    followCard();
+  } else {
+    followCard();   // shown immediately; replaced only if the widget really loads
+
+    var mount = document.createElement('div');
+    mount.className = 'tw-mount';
+    mount.style.display = 'none';
     var a = document.createElement('a');
     a.className = 'twitter-timeline';
     a.setAttribute('data-theme', 'dark');
-    a.setAttribute('data-height', '460');
+    a.setAttribute('data-height', '420');
     a.setAttribute('data-chrome', 'noheader nofooter transparent');
     a.href = 'https://twitter.com/' + handle;
     a.textContent = 'Posts by @' + handle;
+    mount.appendChild(a);
+    twBox.appendChild(mount);
 
-    var s = document.createElement('script');
-    s.src = 'https://platform.twitter.com/widgets.js';
-    s.async = true;
-    s.charset = 'utf-8';
-    // Only swap out the fallback once the widget genuinely renders.
-    s.onload = function () {
-      setTimeout(function () {
-        if (box.querySelector('iframe')) {
-          var fb = box.querySelector('.tw-fallback');
-          if (fb) fb.remove();
-        }
-      }, 2500);
+    var settled = false;
+    var giveUpAt = Date.now() + 12000;
+
+    // Poll rather than trusting one timer: the widget can take a while on a
+    // cold cache, and script.onload fires well before it has rendered.
+    var check = setInterval(function () {
+      if (settled) { clearInterval(check); return; }
+      var frame = mount.querySelector('iframe');
+      if (frame && frame.offsetHeight > 80) {
+        settled = true;
+        clearInterval(check);
+        var fb = twBox.querySelector('.tw-fallback');
+        if (fb) fb.remove();
+        mount.style.display = '';
+      } else if (Date.now() > giveUpAt) {
+        settled = true;
+        clearInterval(check);
+        mount.remove();          // keep the Follow card, drop the dead mount
+      }
+    }, 400);
+
+    var sc = document.createElement('script');
+    sc.src = 'https://platform.twitter.com/widgets.js';
+    sc.async = true;
+    sc.charset = 'utf-8';
+    sc.onerror = function () {
+      settled = true;
+      clearInterval(check);
+      mount.remove();
     };
-    box.appendChild(a);
-    document.body.appendChild(s);
-  } else {
-    var fb = $('#twEmbed .tw-fallback');
-    if (fb) fb.innerHTML = '<div style="font-size:42px;margin-bottom:10px">𝕏</div>' +
-      '<p style="margin:0">Set <code>twitterHandle</code> in <code>assets/js/config.js</code> to show the live timeline here.</p>';
+    document.body.appendChild(sc);
   }
 })();

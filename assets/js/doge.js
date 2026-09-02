@@ -3,8 +3,11 @@
 
    The loop is ~1 MB, so it is never in the critical path: a 17 KB poster paints
    immediately and the animation is fetched only when the band scrolls into
-   view, on a connection that isn't asking us to save data, for a viewer who
-   hasn't asked for less motion. Anyone else gets a Play button.
+   view. It then plays on its own — the loop is the point of the section.
+
+   The one case that still gets a Play button instead of an automatic download
+   is a visitor whose browser is explicitly asking us to save data, where
+   spending a megabyte without being asked would be rude.
    ========================================================================== */
 (function () {
   'use strict';
@@ -41,10 +44,6 @@
     return false;
   }
 
-  function reducedMotion() {
-    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  }
-
   function load() {
     if (loaded) return;
     loaded = true;
@@ -76,7 +75,7 @@
     }
   }
 
-  if (saveData() || reducedMotion()) {
+  if (saveData()) {
     offerPlay();
     return;
   }
