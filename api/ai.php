@@ -69,8 +69,8 @@ function fail(int $code, string $msg): void {
 }
 
 /** The auth header for this provider, per AUTH_STYLE. */
-function authHeader(string $key): string {
-    switch (AUTH_STYLE) {
+function authHeader(string $key, ?string $style = null): string {
+    switch ($style ?: AUTH_STYLE) {
         case 'x-api-key': return 'x-api-key: ' . $key;
         case 'raw':       return 'Authorization: ' . $key;
         case 'api-key':   return 'api-key: ' . $key;
@@ -92,6 +92,113 @@ function apiKey(): string {
         }
     }
     return '';
+}
+
+/* ══════════════════════════════════════════════════════════ discovery ══
+   Providers disagree about the API root, the auth header and the request
+   shape, and a wrong root frequently answers 401 rather than 404 — so a
+   misconfiguration is indistinguishable from a bad key. Rather than make the
+   operator work that out by hand, find the working combination once, cache it,
+   and use it from then on.
+   ---------------------------------------------------------------------- */
+
+const DISCO_TTL = 86400;         // re-check once a day
+const DISCO_TIMEOUT = 10;        // per probe request
+
+function discoFile(): string {
+    return sys_get_temp_dir() . '/robin_endpoint.json';
+}
+
+function discoLoad(): ?array {
+    $f = discoFile();
+    if (!is_readable($f) || filemtime($f) < time() - DISCO_TTL) return null;
+    $j = json_decode((string)@file_get_contents($f), true);
+    return (is_array($j) && !empty($j['root']) && !empty($j['shape'])) ? $j : null;
+}
+
+function discoSave(array $combo): void {
+    @file_put_contents(discoFile(), json_encode($combo), LOCK_EX);
+}
+
+/**
+ * Roots worth trying, configured one first. ROBIN_AI_ROOTS (comma separated)
+ * can prepend your own, which is the quickest fix if your provider's root is
+ * none of the guesses below.
+ */
+function candidateRoots(): array {
+    $extra = getenv('ROBIN_AI_ROOTS') ?: '';
+    $pre = array_filter(array_map('trim', explode(',', $extra)));
+    return array_values(array_unique(array_merge($pre, [
+        API_ROOT,
+        'https://api.concentrate.ai/v1',
+        'https://api.concentrate.ai/api/v1',
+        'https://api.concentrate.ai',
+        'https://concentrate.ai/api/v1',
+        'https://concentrate.ai/v1',
+        'https://concentrate.ai/api',
+    ])));
+}
+
+function candidateAuths(): array {
+    return array_values(array_unique([AUTH_STYLE, 'bearer', 'x-api-key', 'raw', 'api-key']));
+}
+
+/** GET a URL with one auth style. Returns [httpCode, body]. */
+function probeGet(string $url, string $key, string $auth): array {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => DISCO_TIMEOUT,
+        CURLOPT_HTTPHEADER => [authHeader($key, $auth), 'Accept: application/json'],
+    ]);
+    $body = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$code, $body === false ? '' : (string)$body];
+}
+
+/**
+ * Work out root + auth + shape.
+ *
+ * Uses cheap GETs only: /models to find root and auth, then a GET against each
+ * POST-only endpoint — 405/400/422 means it is there, 404 means it is not — so
+ * discovery never spends a generation.
+ */
+function discover(string $key): ?array {
+    foreach (candidateRoots() as $root) {
+        $root = rtrim($root, '/');
+        foreach (candidateAuths() as $auth) {
+            [$code] = probeGet($root . PATH_MODELS, $key, $auth);
+            if ($code !== 200) continue;
+
+            $shape = null;
+            foreach ([[PATH_RESPONSES, 'responses'], [PATH_CHAT, 'chat']] as [$path, $name]) {
+                [$c] = probeGet($root . $path, $key, $auth);
+                if (in_array($c, [400, 405, 422], true)) { $shape = $name; break; }
+            }
+            // Endpoints that answer 200 to a GET tell us nothing; assume the
+            // documented shape rather than giving up.
+            if (!$shape) $shape = (API_SHAPE === 'chat') ? 'chat' : 'responses';
+
+            $combo = ['root' => $root, 'auth' => $auth, 'shape' => $shape];
+            discoSave($combo);
+            error_log('[robin-forge] discovered ' . json_encode($combo));
+            return $combo;
+        }
+    }
+    return null;
+}
+
+/** The combination to use: cached, else discovered, else the configured one. */
+function endpoint(string $key, bool $forceRediscover = false): array {
+    if (!$forceRediscover) {
+        $c = discoLoad();
+        if ($c) return $c;
+    }
+    $c = discover($key);
+    if ($c) return $c;
+    return ['root' => rtrim(API_ROOT, '/'), 'auth' => AUTH_STYLE,
+            'shape' => (API_SHAPE === 'chat' ? 'chat' : 'responses'), 'guessed' => true];
 }
 
 // ── self-test ─────────────────────────────────────────────────────────────
@@ -122,8 +229,11 @@ if (isset($_GET['selftest'])) {
         exit;
     }
     $line('KEY        found (' . substr($key, 0, 8) . '…, ' . strlen($key) . ' chars)');
-    $line('API ROOT   ' . API_ROOT);
-    $line('AUTH       ' . AUTH_STYLE);
+    $line('CONFIGURED ' . API_ROOT . '  auth=' . AUTH_STYLE . '  shape=' . API_SHAPE);
+    $cached = discoLoad();
+    $line('DISCOVERED ' . ($cached
+        ? $cached['root'] . '  auth=' . $cached['auth'] . '  shape=' . $cached['shape']
+        : 'nothing cached yet'));
     $line('MODEL      ' . MODEL);
     $line('PHP        ' . PHP_VERSION . (function_exists('curl_init') ? ', cURL ok' : ', cURL MISSING'));
     $line('REF IMAGE  ' . (is_readable(REF_IMAGE) ? 'ok' : 'NOT READABLE at ' . REF_IMAGE));
@@ -295,42 +405,37 @@ if (isset($_GET['selftest'])) {
     if (isset($_GET['image'])) {
         $line();
         $line('--- live image test (this costs one generation) ---');
+        $ep = endpoint($key, true);
+        $line('USING      ' . $ep['root'] . '  auth=' . $ep['auth'] . '  shape=' . $ep['shape']
+              . (!empty($ep['guessed']) ? '   (guessed — discovery found nothing)' : '   (discovered)'));
+
         $prompt = 'Draw a simple flat green circle on a white background.';
-        $order = API_SHAPE === 'chat' ? ['chat'] : ['responses'];
-        if (API_SHAPE === 'auto') $order[] = 'chat';
+        [$code, $j, $raw, $cerr] = attempt($ep, $key, MODEL, $prompt, null);
+        $line('HTTP       ' . ($code ?: 'ERR'));
 
-        foreach ($order as $shape) {
-            $path = $shape === 'responses' ? PATH_RESPONSES : PATH_CHAT;
-            $payload = $shape === 'responses'
-                ? bodyResponses(MODEL, $prompt, null)
-                : bodyChat(MODEL, $prompt, null);
-            [$code, $j, $raw, $cerr] = post(API_ROOT . $path, $key, $payload, 120);
-
-            $line(strtoupper($shape) . ' ' . API_ROOT . $path . '  ->  HTTP ' . ($code ?: 'ERR'));
-            if ($raw === false) { $line('           ' . $cerr); break; }
-
-            if ($code === 404 || $code === 405) {
-                $line('           endpoint not present here; trying the next shape');
-                continue;
-            }
-
+        if ($raw === false) {
+            $line('           ' . $cerr);
+        } else {
             $img = extractImage(is_array($j) ? $j : []);
             if ($img) {
                 $line('RESULT     an image came back (' . strlen($img) . ' chars)');
                 $line();
-                $line('Everything works. Set API_SHAPE to \'' . $shape . '\' to skip the probing.');
+                $line('Everything works. The site caches this combination, so nothing');
+                $line('needs changing in the config.');
             } else {
-                $err = $j['error']['message'] ?? $j['message'] ?? '';
+                $err  = $j['error']['message'] ?? $j['message'] ?? '';
                 $said = is_string($j['choices'][0]['message']['content'] ?? null)
                       ? $j['choices'][0]['message']['content'] : '';
                 $line('RESULT     NO IMAGE');
-                if ($err)  $line('           provider said: ' . substr($err, 0, 220));
-                if ($said) $line('           model replied with text: "' . substr(trim($said), 0, 160) . '"');
+                if ($err)  $line('           provider said: ' . substr($err, 0, 250));
+                if ($said) $line('           model replied with text: "' . substr(trim($said), 0, 180) . '"');
                 if (!$err && !$said) {
-                    $line('           raw: ' . substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 400));
+                    $line('           raw: ' . substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 500));
                 }
+                $line();
+                $line('If the provider named a model problem, put a model it does serve');
+                $line('into ai.model in assets/js/config.js — see the list above.');
             }
-            break;
         }
     } else {
         $line();
@@ -370,14 +475,15 @@ function bodyChat(string $model, string $text, ?string $refDataUrl): array {
 }
 
 /** One POST, returning [httpCode, decodedJson, rawBody, curlError]. */
-function post(string $url, string $key, array $payload, int $timeout = TIMEOUT): array {
+function post(string $url, string $key, array $payload, int $timeout = TIMEOUT,
+              ?string $auth = null): array {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => $timeout,
         CURLOPT_POSTFIELDS => json_encode($payload),
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json', authHeader($key)],
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', authHeader($key, $auth)],
     ]);
     $raw  = curl_exec($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -483,40 +589,53 @@ if (is_readable(REF_IMAGE)) {
 
 $model = (string)($body['model'] ?? '') ?: MODEL;
 
-/* Try the configured shape; if that path simply is not there (404/405), try
-   the other one rather than failing on a guess about this provider's API. */
-$order = API_SHAPE === 'chat' ? ['chat'] : ['responses'];
-if (API_SHAPE === 'auto') $order[] = 'chat';
-
-$code = 0; $j = null; $rawBody = ''; $cerr = ''; $used = '';
-
-foreach ($order as $shape) {
-    $used = $shape;
-    if ($shape === 'responses') {
-        [$code, $j, $rawBody, $cerr] = post(API_ROOT . PATH_RESPONSES, $key,
-            bodyResponses($model, $style, $ref));
-    } else {
-        [$code, $j, $rawBody, $cerr] = post(API_ROOT . PATH_CHAT, $key,
-            bodyChat($model, $style, $ref));
+/**
+ * Send one attempt with a given combination.
+ * Returns [httpCode, decodedJson, rawBody, curlError].
+ */
+function attempt(array $ep, string $key, string $model, string $style, ?string $ref): array {
+    if ($ep['shape'] === 'chat') {
+        return post($ep['root'] . PATH_CHAT, $key, bodyChat($model, $style, $ref),
+                    TIMEOUT, $ep['auth']);
     }
-    if ($rawBody === false) break;                 // network failure, not a shape problem
-    if ($code !== 404 && $code !== 405) break;     // this endpoint exists; keep its answer
+    return post($ep['root'] . PATH_RESPONSES, $key, bodyResponses($model, $style, $ref),
+                TIMEOUT, $ep['auth']);
+}
+
+$ep = endpoint($key);
+[$code, $j, $rawBody, $cerr] = attempt($ep, $key, $model, $style, $ref);
+
+/* A cached combination can go stale, and a first guess can simply be wrong.
+   Either shows up as a refusal, so rediscover once and try again rather than
+   handing the visitor an error that only the owner can act on. */
+if ($rawBody !== false && in_array($code, [401, 403, 404, 405], true)) {
+    $fresh = endpoint($key, true);
+    if ($fresh !== $ep) {
+        $ep = $fresh;
+        [$code, $j, $rawBody, $cerr] = attempt($ep, $key, $model, $style, $ref);
+    }
+    // Still refused, and the other shape is untried? It costs one more call.
+    if ($rawBody !== false && in_array($code, [404, 405], true)) {
+        $ep['shape'] = $ep['shape'] === 'chat' ? 'responses' : 'chat';
+        [$code, $j, $rawBody, $cerr] = attempt($ep, $key, $model, $style, $ref);
+        if ($code === 200) discoSave($ep);
+    }
 }
 
 if ($rawBody === false) fail(502, 'Could not reach the image service: ' . $cerr);
 
 if ($code !== 200) {
     $m = $j['error']['message'] ?? $j['message'] ?? 'Upstream error';
-    error_log('[robin-forge] ' . $used . ' ' . $code . ': ' . $m);
+    error_log('[robin-forge] ' . json_encode($ep) . ' HTTP ' . $code . ': ' . $m);
     if ($code === 401 || $code === 403) {
         fail(502, 'The image service refused the request. (Owner: run '
-                . 'api/ai.php?selftest=1&probe=1 — it tries every API root, auth header '
-                . 'and endpoint shape and prints which one works.)');
+                . 'api/ai.php?selftest=1&probe=1 — it prints the provider\'s own '
+                . 'error for every root, auth header and endpoint shape.)');
     }
     if ($code === 429) fail(429, 'The image service is rate-limiting us. Try again shortly.');
     if ($code === 404 || $code === 405) {
-        fail(502, 'No image endpoint found at the configured API root. '
-                . '(Owner: run api/ai.php?selftest=1&probe=1.)');
+        fail(502, 'No image endpoint found. (Owner: run api/ai.php?selftest=1&probe=1 '
+                . 'and set API_ROOT from what it reports.)');
     }
     fail(502, 'The image service is busy. Try again in a moment.');
 }

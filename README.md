@@ -222,26 +222,35 @@ Read the report top to bottom; it names the fix for each failure:
 | `CONNECT tunnel failed` | Your host blocks outbound HTTPS — ask them to allow it |
 | `RESULT NO IMAGE` + text | You pointed at a text model; pick one from the list it printed |
 
-### When the key is "rejected"
+### It configures itself
+
+You should not have to set any of this. On the first request the proxy works
+out the provider's **API root, auth header and request shape** for itself, using
+cheap `GET`s only — `/models` to find the root and auth, then a `GET` against
+each POST-only endpoint (`405` means it is there, `404` means it is not) — so
+discovery never spends a generation. The working combination is cached for a
+day; a failed search is remembered for five minutes so it is not re-run on every
+page view. The whole search is capped at 25 seconds and skips hosts that do not
+answer at all.
+
+If a cached combination later stops working, one refusal triggers a fresh
+search and a retry before the visitor sees an error.
+
+`test/discovery.test.sh` proves this against a mock provider whose root, auth
+header and shape all differ from the defaults.
+
+### If it still cannot find your provider
 
 ```
 https://shopping.io/robin/api/ai.php?selftest=1&probe=1
 ```
 
-A rejected key and a wrong endpoint look identical from outside — plenty of
-gateways answer `401` for a path they do not recognise. The probe tries every
-plausible API root against every common auth header (`Authorization: Bearer`,
-`x-api-key`, a raw `Authorization`, `api-key`), prints the exact status and the
-provider's own error text for each, then reports **which endpoints actually
-exist** at whichever root worked.
-
-Copy its findings into the three constants at the top of `api/ai.php`:
-
-| Constant | What it sets |
-|---|---|
-| `API_ROOT` | the provider's API root, no endpoint path |
-| `AUTH_STYLE` | `bearer` \| `x-api-key` \| `raw` \| `api-key` |
-| `API_SHAPE` | `responses` \| `chat` \| `auto` |
+The probe prints the provider's own error for every root, auth header and
+endpoint shape it tried. If nothing answers `200`, your API root is not among
+the guesses — take it from your provider's docs and either set `API_ROOT` at
+the top of `api/ai.php`, or set the `ROBIN_AI_ROOTS` environment variable
+(comma separated) to have discovery try yours first. No code change needed for
+the second option.
 
 ### Two API shapes
 

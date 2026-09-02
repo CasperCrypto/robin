@@ -4,7 +4,7 @@
   "private": true,
   "description": "$ROBIN \u2014 Robin Nakamoto. Static site for shopping.io/robin.",
   "scripts": {
-    "test": "node test/abi.test.js && node test/smoke.test.js",
+    "test": "node test/abi.test.js && node test/smoke.test.js && bash test/discovery.test.sh",
     "preview": "node build-preview.js && node test/preview.test.js preview.html",
     "package": "bash package.sh",
     "shots": "node test/shots.js ./shots"
