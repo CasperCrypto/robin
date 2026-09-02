@@ -210,12 +210,12 @@
     // fiat hints
     if (p && amtIn > 0) {
       var usdIn = buy ? amtIn * (p.usdPerEth || 0) : amtIn * (p.usdPerRobin || 0);
-      el.fiatIn.textContent = usdIn ? '≈ ' + RB.usd(usdIn, { exact: true }) : '';
+      el.fiatIn.textContent = usdIn ? '≈ ' + RB.usd(usdIn, { money: true, exact: true }) : '';
     } else { el.fiatIn.textContent = ''; }
 
     if (p && out > 0) {
       var usdOut = buy ? out * (p.usdPerRobin || 0) : out * (p.usdPerEth || 0);
-      el.fiatOut.textContent = usdOut ? '≈ ' + RB.usd(usdOut, { exact: true }) : '';
+      el.fiatOut.textContent = usdOut ? '≈ ' + RB.usd(usdOut, { money: true, exact: true }) : '';
     } else { el.fiatOut.textContent = ''; }
 
     // rate + minimum received

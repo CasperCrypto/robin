@@ -162,10 +162,13 @@
     state.pair        = p;
     state.priceUsd    = parseFloat(p.priceUsd) || null;
     state.priceNative = parseFloat(p.priceNative) || null;
-    // Prefer the real market cap; only fall back to FDV when it is absent,
-    // not merely zero.
-    state.mcap        = (p.marketCap != null) ? p.marketCap
-                      : (p.fdv != null ? p.fdv : null);
+    // Market cap is computed, not taken on trust: the supply comes from the
+    // token contract itself (totalSupply) and the price from the live pool.
+    // Only if the supply read has not landed yet do we fall back to the
+    // reported field.
+    state.mcap = (state.supply && state.priceUsd)
+      ? state.supply * state.priceUsd
+      : ((p.marketCap != null) ? p.marketCap : (p.fdv != null ? p.fdv : null));
     state.vol24       = (p.volume && p.volume.h24) || 0;
     state.liq         = (p.liquidity && p.liquidity.usd) || 0;
     state.change24    = (p.priceChange && p.priceChange.h24);
@@ -232,10 +235,18 @@
   });
 
   // Real supply, straight from the contract.
-  totalSupply().then(function (s) {
-    state.supply = fromUnits(s, C.token.decimals);
+  totalSupply().then(function (sup) {
+    state.supply = fromUnits(sup, C.token.decimals);
+    // Recompute now that we know the real supply.
+    if (state.priceUsd) {
+      state.mcap = state.supply * state.priceUsd;
+      paint('mcap', els.mcap, RB.usd(state.mcap));
+    }
     emit();
-  }).catch(function () { state.supply = C.token.supply; });
+  }).catch(function () {
+    // Contract unreachable — keep whatever the pool reported.
+    state.supply = null;
+  });
 
   start();
 

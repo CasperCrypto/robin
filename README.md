@@ -103,15 +103,28 @@ point of the section), a sticky bar with the live price and a Buy button follows
 you once you're past the hero, and the layout is checked for horizontal overflow
 at 360px, 390px and 1280px in a real browser via `npm run shots`.
 
-**Market strip** — price, 24h move, market cap, volume and liquidity, polled from the
-DexScreener API every 30s. Pauses in a background tab. Total supply is read from the
-contract itself, not hardcoded.
+**Market strip** — price, 24h move, volume and liquidity come from the
+DexScreener API for your exact pool, polled every 30s and paused in a background
+tab.
 
-**Live trade feed** — reads ERC-20 `Transfer` logs straight from the Robinhood Chain RPC.
-There's no trades API for a V4 pool, so it works out which address is the pool (in any
-window of recent transfers it's overwhelmingly the most frequent participant) and calls
-transfers out of it buys, transfers in sells. Bigger buys get a bigger animal. If you'd
-rather pin it, set `market.poolContract` in the config.
+**Market cap is computed, not reported.** The supply is read from your token
+contract (`totalSupply`) and multiplied by the live pool price, rather than
+trusting DexScreener's own `marketCap` field, which can be stale or absent. If
+the contract read fails, it falls back to the reported figure.
+
+> The bundled `preview.html` tries the real APIs first and only substitutes
+> sample figures when the request is actually refused — which is what happens
+> inside a sandboxed preview. When it falls back it shows a "PREVIEW SANDBOX"
+> badge. Open that file from your own disk or server and it shows genuinely
+> live numbers. The uploaded site never uses samples at all.
+
+**Live buys** — reads ERC-20 `Transfer` logs straight from the Robinhood Chain
+RPC. There is no trades API for a V4 pool, so it identifies the pool as the
+dominant participant in a window of recent transfers, then treats tokens
+*leaving* the pool as a buy. **Sells are recognised so they can be excluded, not
+shown** — set `market.showSells: true` in the config if you ever want them.
+Bigger buys get a bigger animal. Pin the pool with `market.poolContract` to skip
+the auto-detection.
 
 **Swap panel** — connects any EVM wallet, adds Robinhood Chain (4663) if the wallet
 doesn't have it, reads real balances, quotes from the live pool and shows minimum

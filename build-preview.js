@@ -37,15 +37,21 @@ const fontLink = html.match(/<link href="https:\/\/fonts\.googleapis[^>]+>/)[0];
 const demo = fs.readFileSync(path.join(root, 'test/demo-shim.js'), 'utf8');
 
 const demoBadge = `
+<style>
+  /* The shim sets this attribute only when a real request actually failed, so
+     a preview that can reach the network shows nothing at all. */
+  #demoBadge{display:none}
+  html[data-preview-sample] #demoBadge{display:flex}
+</style>
 <div id="demoBadge" style="
   position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:400;
-  display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;
-  background:rgba(8,11,5,.9);color:#c9f05e;border:1px solid rgba(255,255,255,.16);
+  align-items:center;gap:8px;padding:9px 16px;border-radius:999px;
+  background:rgba(8,11,5,.9);color:#ffd447;border:1px solid rgba(255,212,71,.35);
   font:600 12px/1 Inter,system-ui,sans-serif;letter-spacing:.02em;
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   box-shadow:0 12px 34px -14px rgba(0,0,0,.9);pointer-events:none;">
   <span style="width:7px;height:7px;border-radius:50%;background:#ffd447;flex:none"></span>
-  PREVIEW — sample data, not live prices
+  PREVIEW SANDBOX — live APIs blocked, showing samples
 </div>`;
 
 const banner =

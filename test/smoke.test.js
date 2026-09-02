@@ -16,7 +16,7 @@ const PAIR = {
   quoteToken: { address: '0x0000000000000000000000000000000000000000', symbol: 'ETH' },
   priceUsd: '0.00042137', priceNative: '0.000000112',
   priceChange: { h24: 18.4 }, volume: { h24: 128450 },
-  liquidity: { usd: 96200 }, marketCap: 421370, fdv: 421370,
+  liquidity: { usd: 96200 }, marketCap: 999999999, fdv: 888888888,   // deliberately wrong: we should ignore these
   txns: { h24: { buys: 214, sells: 97 } },
 };
 
@@ -43,9 +43,25 @@ win.fetch = (url, opts) => {
   if (u.includes('rpc.mainnet.chain.robinhood.com')) {
     rpcCalls++;
     const body = JSON.parse(opts.body);
+    // Four buys (tokens leaving the pool) and two sells (tokens going in), so
+    // the buys-only filter has something real to exclude.
+    const POOL = '0x1111111111111111111111111111111111111111';
+    const TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const pad = (a) => '0x' + a.replace(/^0x/, '').toLowerCase().padStart(64, '0');
+    const wallet = (n) => '0xbb' + String(n).repeat(38).slice(0, 38);  // never collides with POOL
+    const LOGS = [
+      [true, 1], [true, 2], [false, 3], [true, 4], [false, 5], [true, 6],
+    ].map(([isBuy, n], i) => ({
+      topics: [TOPIC, pad(isBuy ? POOL : wallet(n)), pad(isBuy ? wallet(n) : POOL)],
+      data: '0x' + (BigInt(1000 * (i + 1)) * 10n ** 18n).toString(16).padStart(64, '0'),
+      transactionHash: '0x' + String(i + 1).repeat(64).slice(0, 64),
+      logIndex: '0x' + i.toString(16),
+      blockNumber: '0x' + (1234560 + i).toString(16),
+    }));
+
     const results = {
       eth_blockNumber: '0x' + (1234567).toString(16),
-      eth_getLogs: [],
+      eth_getLogs: LOGS,
       eth_call: '0x' + (10n ** 27n).toString(16).padStart(64, '0'), // totalSupply = 1e9 * 1e18
     };
     return Promise.resolve({
@@ -80,7 +96,10 @@ setTimeout(() => {
     d.querySelector('.ca-short')?.textContent);
   check('price populated from pair', t('#sPrice').startsWith('$'), t('#sPrice'));
   check('24h change populated', t('#sChange').includes('18.4'), t('#sChange'));
-  check('market cap populated', t('#sMcap') === '$421.4K', t('#sMcap'));
+  // supply (1e9, from the stubbed totalSupply) x price (0.00042137) = $421,370.
+  // The pair reports $999,999,999; if that leaked through, this fails.
+  check('market cap is computed from on-chain supply, not the reported field',
+    t('#sMcap') === '$421.4K', t('#sMcap') + ' (pair claimed $1.00B)');
   check('volume populated', t('#sVol') === '$128.4K', t('#sVol'));
   check('liquidity populated', t('#sLiq') === '$96.2K', t('#sLiq'));
   check('marquee filled', d.querySelectorAll('#marquee span').length === 20);
@@ -108,6 +127,14 @@ setTimeout(() => {
   check('RPC was actually called', rpcCalls > 0, `calls=${rpcCalls}`);
   check('footer year set', /^\d{4}$/.test(t('#yr')), t('#yr'));
   check('sticky buy bar present', !!d.querySelector('#buybar'));
+  check('feed is buys only by default', win.ROBIN.market.showSells === false);
+  // The stub served 4 buys and 2 sells; only the buys may reach the DOM.
+  check('renders exactly the 4 buys', d.querySelectorAll('#feedList .buy').length === 4,
+    'got ' + d.querySelectorAll('#feedList .buy').length);
+  check('drops the 2 sells', d.querySelectorAll('#feedList .buy.sell').length === 0);
+  check('no minus signs in a buys-only feed',
+    !/[\u2212-]\s*[\d]/.test(d.querySelector('#feedList')?.textContent || ''));
+  check('feed heading says buys', /Live buys/.test(d.querySelector('.feed-head h3')?.textContent || ''));
   check('buy bar shows live price', /\$0\.000/.test(t('#bbPrice')), t('#bbPrice'));
   check('meme band present', !!d.querySelector('#dogeAnim'));
   check('animation is lazy (poster only at rest)',

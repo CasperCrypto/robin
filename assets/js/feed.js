@@ -4,8 +4,12 @@
    There is no trades API for this pool, so we watch ERC-20 Transfer logs and
    work out which side each one is. The pool address is auto-detected: in a
    window of recent transfers the liquidity contract is, by a wide margin, the
-   address that appears most often. Transfers out of it are buys, transfers
-   into it are sells. Set market.poolContract in config to skip the detection.
+   address that appears most often. Tokens leaving the pool means somebody
+   bought; tokens going in means somebody sold.
+
+   Only buys are shown. Sells are still recognised so they can be excluded
+   rather than mistaken for buys — flip market.showSells in config to display
+   them too.
    ========================================================================== */
 (function () {
   'use strict';
@@ -71,6 +75,7 @@
     if (!S.pool) return null;
     var isBuy = from === S.pool, isSell = to === S.pool;
     if (!isBuy && !isSell) return null;                     // wallet-to-wallet
+    if (isSell && !C.market.showSells) return null;         // buys only, by default
 
     var amount = RB.fromUnits(RB.hexToBig(l.data), C.token.decimals);
     if (!amount) return null;
@@ -108,8 +113,8 @@
       return '<div class="buy' + (r.buy ? '' : ' sell') + '">' +
         '<div class="emo">' + emoji(usd, r.buy) + '</div>' +
         '<div class="info">' +
-          '<div class="amt">' + (r.buy ? '+' : '−') + RB.num(r.amount) + ' ROBIN' +
-            (usd ? ' <span style="opacity:.6;font-weight:600">' + RB.usd(usd) + '</span>' : '') + '</div>' +
+          '<div class="amt">' + (r.buy ? '+' : '\u2212') + RB.num(r.amount) + ' ROBIN' +
+            (usd ? ' <span style="opacity:.6;font-weight:600">' + RB.usd(usd, { money: true }) + '</span>' : '') + '</div>' +
           '<div class="sub"><span>' + RB.shortAddr(r.who) + '</span>' +
             '<a href="' + RB.esc(RB.scan('tx', r.tx)) + '" target="_blank" rel="noopener">tx ↗</a></div>' +
         '</div>' +
@@ -131,7 +136,7 @@
       if (announce && row.buy) {
         var price = RB.market.state.priceUsd;
         var usd = price ? row.amount * price : null;
-        RB.toast('New buy: ' + RB.num(row.amount) + ' ROBIN' + (usd ? ' (' + RB.usd(usd) + ')' : ''),
+        RB.toast('New buy: ' + RB.num(row.amount) + ' ROBIN' + (usd ? ' (' + RB.usd(usd, { money: true }) + ')' : ''),
                  'ok', { href: RB.scan('tx', row.tx), text: 'View' });
       }
     });

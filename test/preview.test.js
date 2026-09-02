@@ -48,7 +48,11 @@ setTimeout(() => {
   check('swap rate populated', t('#mRate').includes('ROBIN'), t('#mRate'));
   check('supply facts rendered', d.querySelectorAll('#tokList .fact').length===4);
   check('meme forge present', !!d.querySelector('#forgeStage'));
-  check('preview is labelled as sample data', !!d.querySelector('#demoBadge'));
+  check('sample badge exists and is armed by the fallback',
+    !!d.querySelector('#demoBadge') &&
+    d.documentElement.getAttribute('data-preview-sample') === '1');
+  check('feed shows buys only', d.querySelectorAll('#feedList .buy.sell').length === 0 &&
+    d.querySelectorAll('#feedList .buy').length > 0);
   check('no script errors', errors.length===0, errors.join(' | '));
 
   console.log(`\n${pass} passed, ${fail} failed`);

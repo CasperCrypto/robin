@@ -43,30 +43,66 @@
   var SAMPLE = 'assets/img/forge-sample.webp';
 
   var real = window.fetch ? window.fetch.bind(window) : null;
+
+  /* Mark the page as running on samples — only ever called if a real request
+     actually failed, so a preview that CAN reach the network stays honest. */
+  var fellBack = false;
+  function markSample() {
+    if (fellBack) return;
+    fellBack = true;
+    document.documentElement.setAttribute('data-preview-sample', '1');
+  }
+
+  function J(obj, ms) {
+    return new Promise(function (res) {
+      setTimeout(function () {
+        res({ ok: true, status: 200, json: function () { return Promise.resolve(obj); } });
+      }, ms || 200);
+    });
+  }
+
+  /* Try the real endpoint first. The published preview is sandboxed and the
+     request will be refused, which is when — and only when — we substitute a
+     sample. Open this file from disk and you get genuinely live numbers. */
+  function passthroughOr(url, opts, fallback) {
+    // No fetch at all is still a fallback, and must be flagged as one.
+    if (!real) { markSample(); return fallback(); }
+    return real(url, opts).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r;
+    }).catch(function () {
+      markSample();
+      return fallback();
+    });
+  }
+
   window.fetch = function (url, opts) {
     var u = String(url && url.url ? url.url : url);
-    var J = function (obj, ms) {
-      return new Promise(function (res) {
-        setTimeout(function () { res({ ok: true, status: 200, json: function () { return Promise.resolve(obj); } }); }, ms || 260);
-      });
-    };
-    if (u.indexOf('dexscreener') > -1) return J({ pairs: [PAIR] });
-    if (u.indexOf('chain.robinhood.com') > -1) {
-      var b = {}; try { b = JSON.parse(opts.body); } catch (e) {}
-      if (b.method === 'eth_blockNumber') return J({ result: '0x' + (block).toString(16) }, 90);
-      if (b.method === 'eth_getLogs')     return J({ result: makeLogs(served++ ? 1 : 9, !served) }, 200);
-      if (b.method === 'eth_getBalance')  return J({ result: '0x' + (842000000000000000n).toString(16) }, 80);
-      if (b.method === 'eth_call') {
-        var sel = (b.params && b.params[0] && b.params[0].data || '').slice(0, 10);
-        // balanceOf -> a plausible bag; totalSupply -> the real fixed supply
-        var v = sel === '0x70a08231' ? 1240000n * 10n ** 18n : 10n ** 27n;
-        return J({ result: '0x' + v.toString(16).padStart(64, '0') }, 90);
-      }
-      return J({ result: '0x0' }, 60);
+
+    if (u.indexOf('dexscreener') > -1) {
+      return passthroughOr(url, opts, function () { return J({ pairs: [PAIR] }); });
     }
+
+    if (u.indexOf('chain.robinhood.com') > -1) {
+      return passthroughOr(url, opts, function () {
+        var b = {}; try { b = JSON.parse(opts.body); } catch (e) {}
+        if (b.method === 'eth_blockNumber') return J({ result: '0x' + (block).toString(16) }, 90);
+        if (b.method === 'eth_getLogs')     return J({ result: makeLogs(served++ ? 1 : 9, !served) }, 200);
+        if (b.method === 'eth_getBalance')  return J({ result: '0x' + (842000000000000000n).toString(16) }, 80);
+        if (b.method === 'eth_call') {
+          var sel = (b.params && b.params[0] && b.params[0].data || '').slice(0, 10);
+          var v = sel === '0x70a08231' ? 1240000n * 10n ** 18n : 10n ** 27n;
+          return J({ result: '0x' + v.toString(16).padStart(64, '0') }, 90);
+        }
+        return J({ result: '0x0' }, 60);
+      });
+    }
+
     if (u.indexOf('api/ai') > -1) {
+      markSample();
       return J({ image: SAMPLE, model: 'preview-sample' }, 2600);
     }
+
     return real ? real(url, opts) : Promise.reject(new Error('blocked'));
   };
 

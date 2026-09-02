@@ -39,8 +39,10 @@ window.ROBIN = {
     // Poll interval for price / mcap / volume, in milliseconds.
     refreshMs: 30000,
     // Optional: the pool/PoolManager contract holding liquidity. Leave blank and
-    // the live-trade feed auto-detects it from recent Transfer logs.
-    poolContract: ''
+    // the live-buy feed auto-detects it from recent Transfer logs.
+    poolContract: '',
+    // The feed shows buys only. Set true to show sells alongside them.
+    showSells: false
   },
 
   /* ----------------------------------------------------------------- swap */

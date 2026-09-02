@@ -10,11 +10,21 @@
   var $  = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
-  /** Compact USD: $1.23K / $4.56M. Sub-cent prices keep significant digits. */
+  /**
+   * Compact USD: $1.23K / $4.56M.
+   *
+   * A token price and a dollar total want different precision — $0.00007012 is
+   * meaningful, $3.1257 is not — so `money: true` rounds to cents the way a
+   * total should, while the default keeps significant digits for sub-cent
+   * prices.
+   */
   function usd(n, opts) {
     if (n == null || !isFinite(n)) return '—';
     opts = opts || {};
     var a = Math.abs(n);
+    if (opts.money && a >= 0.01 && a < 1000) {
+      return '$' + n.toFixed(2);
+    }
     if (!opts.exact) {
       if (a >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
       if (a >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
