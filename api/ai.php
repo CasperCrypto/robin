@@ -78,20 +78,40 @@ function authHeader(string $key, ?string $style = null): string {
     }
 }
 
-function apiKey(): string {
-    foreach (['ROBIN_AI_KEY', 'OPENROUTER_API_KEY', 'CONCENTRATE_API_KEY'] as $n) {
-        $v = getenv($n) ?: ($_SERVER[$n] ?? '');
-        if ($v) return trim((string)$v);
-    }
-    if (is_readable(__DIR__ . '/config.php')) {
-        $cfg = require __DIR__ . '/config.php';
-        if (is_array($cfg)) {
-            foreach (['ROBIN_AI_KEY', 'OPENROUTER_API_KEY', 'CONCENTRATE_API_KEY'] as $n) {
-                if (!empty($cfg[$n])) return trim((string)$cfg[$n]);
-            }
-        }
+const KEY_NAMES = ['ROBIN_AI_KEY', 'OPENROUTER_API_KEY', 'CONCENTRATE_API_KEY'];
+
+function keyFromFile(string $file): string {
+    if (!is_readable($file)) return '';
+    $cfg = require $file;
+    if (!is_array($cfg)) return '';
+    foreach (KEY_NAMES as $n) {
+        if (!empty($cfg[$n])) return trim((string)$cfg[$n]);
     }
     return '';
+}
+
+/**
+ * Where the key came from, so the self-test can say which file is in play.
+ * Order matters: config.local.php wins over config.php because config.php
+ * ships in the zip and is overwritten by every upload. Put a rotated key in
+ * config.local.php and no future upload can revert it.
+ */
+function apiKeySource(): array {
+    foreach (KEY_NAMES as $n) {
+        $v = getenv($n) ?: ($_SERVER[$n] ?? '');
+        if ($v) return [trim((string)$v), 'environment variable ' . $n];
+    }
+    $k = keyFromFile(__DIR__ . '/config.local.php');
+    if ($k !== '') return [$k, 'api/config.local.php'];
+
+    $k = keyFromFile(__DIR__ . '/config.php');
+    if ($k !== '') return [$k, 'api/config.php'];
+
+    return ['', 'nowhere'];
+}
+
+function apiKey(): string {
+    return apiKeySource()[0];
 }
 
 /* ══════════════════════════════════════════════════════════ discovery ══
@@ -238,11 +258,20 @@ if (isset($_GET['selftest'])) {
         $line('KEY        MISSING');
         $line();
         $line('Set ROBIN_AI_KEY as an environment variable, or create');
-        $line('api/config.php containing:');
+        $line('api/config.local.php containing:');
         $line("    <?php return ['ROBIN_AI_KEY' => 'your-key'];");
+        $line();
+        $line('(config.local.php is preferred over config.php because it is never');
+        $line(' shipped in the zip, so uploading a new build cannot overwrite it.)');
         exit;
     }
     $line('KEY        found (' . substr($key, 0, 8) . '…, ' . strlen($key) . ' chars)');
+    $line('  from     ' . apiKeySource()[1]);
+    if (apiKeySource()[1] === 'api/config.php') {
+        $line('           note: config.php ships in the zip, so a future upload will');
+        $line('           overwrite it. If you rotate the key, put the new one in');
+        $line('           api/config.local.php instead — that file is never shipped.');
+    }
     $line('CONFIGURED ' . API_ROOT . '  auth=' . AUTH_STYLE . '  shape=' . API_SHAPE);
     $cached = discoLoad();
     $line('DISCOVERED ' . ($cached

@@ -7,5 +7,6 @@ shots/
 
 # Never commit API keys
 api/config.php
+api/config.local.php
 .env
 .env.*

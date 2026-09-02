@@ -8,27 +8,76 @@ deploy — upload the folder and it runs.
 
 ---
 
-## Upload it
+## Deploy to InMotion (or any cPanel host)
 
-Copy the contents of `dist/` (or the repo root, minus `test/` and the build scripts) to
-whatever directory serves `shopping.io/robin`:
+Plain HTML, CSS and JavaScript plus two PHP files. No build step, no npm, no
+Node on the server.
+
+**1. Upload.** cPanel → **File Manager** → `public_html`, create a folder called
+`robin`, upload `robin-site.zip` into it and hit **Extract**:
 
 ```
-robin/
+public_html/robin/
+├── .htaccess
 ├── index.html
 ├── assets/
-│   ├── css/style.css
-│   ├── js/*.js
-│   └── img/*.svg
 └── api/
-    ├── ai.php          ← PHP hosting
-    └── ai.js           ← Node / Vercel hosting (delete if you use PHP)
+    ├── ai.php        ← the meme forge
+    ├── rpc.php       ← chain relay, fixes an empty buy feed
+    └── config.php    ← your API key
 ```
 
-Every path in the site is **relative**, so it works from a sub-path like `/robin` with
-nothing to reconfigure.
+`shopping.io/robin` is live. Every path is relative, so the sub-folder needs no
+configuration.
 
-To rebuild the zip yourself: `./package.sh` → `robin-site.zip`.
+> File Manager hides dotfiles. If `.htaccess` seems missing, turn on
+> **Settings → Show Hidden Files** before extracting.
+
+**2. PHP version.** cPanel → **Select PHP Version** → **8.0 or newer**, with the
+`curl` extension ticked.
+
+**3. Check it.** Open `https://shopping.io/robin/api/ai.php?selftest=1&probe=1`.
+It reports whether the key loaded, whether your host can reach the internet at
+all, and which endpoint your provider actually uses.
+
+**4. HTTPS.** Once the certificate is active in cPanel, uncomment the redirect
+block at the bottom of `.htaccess`.
+
+---
+
+## Updating later
+
+**Do not delete anything first. Extract the new zip straight over the top.**
+Every file has a stable name, so new copies replace old ones. Deleting first
+only risks losing the one file you may have edited.
+
+Each zip stamps its own build id onto the stylesheet and script URLs
+(`style.css?v=202609021845`), so browsers fetch the new files immediately
+instead of serving yesterday's from cache. **To confirm an update landed**, view
+source and look at that number — if it changed, you are on the new build.
+
+Editing a file by hand on the server instead? Bump the `?v=` numbers in
+`index.html` yourself, or the old version keeps being served.
+
+### The one file to be careful with
+
+`api/config.php` ships inside the zip **with your API key in it**, so uploading
+replaces it. Harmless while the key is unchanged — but if you rotate the key,
+put the new one in **`api/config.local.php`** instead:
+
+```php
+<?php return ['ROBIN_AI_KEY' => 'your-new-key'];
+```
+
+That file is never shipped, never overwritten, and takes precedence over
+`config.php`. The self-test prints which file the key came from, so you can
+always see which is in play.
+
+### Leftovers from older builds
+
+Files earlier versions shipped and this one does not — the old
+`assets/img/*.svg` artwork, for instance — are harmless if they linger, because
+nothing references them. Tidy them up if you like; the site does not care.
 
 ---
 
