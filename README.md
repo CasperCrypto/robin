@@ -70,7 +70,26 @@ links.twitter    // your real X URL — the footer link and the timeline embed
 links.telegram   // leave '' and the link is removed rather than left dead
 twitterHandle    // handle only, no @, for the live timeline
 distribution     // the tokenomics rows and their percentages
+swap.feePct      // total fee the Pons hook takes per swap (see below)
 ```
+
+### `swap.feePct` — read this if you changed your creator fee
+
+Set to **4** (3% creator + 1% protocol). It is not cosmetic.
+
+Quotes come from the pool's mid-price via DexScreener, and the mid-price knows
+nothing about the Pons hook. Without subtracting the fee the panel would promise
+about 4% more output than the pool actually pays, and `minimum received` would be
+computed from that inflated number — so any swap with a tolerance under 4% would
+revert every single time.
+
+With `feePct` set, the quote is honest, the fee gets its own row in the panel, and
+the slippage setting only has to cover real price movement. If you change your
+creator fee on Pons, change this number to match.
+
+Creator fees themselves do not depend on this site at all — they are enforced by
+the hook attached to the V4 pool, so every swap that touches the pool pays them
+no matter which front-end sent it.
 
 Contract address, chain details and the DexScreener pool are already filled in.
 

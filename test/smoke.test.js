@@ -116,6 +116,32 @@ setTimeout(() => {
     [...d.querySelectorAll('a[href="#"]')].length === 0,
     [...d.querySelectorAll('a[href="#"]')].map(a => a.id).join(','));
 
+  // ── fee-aware quoting ────────────────────────────────────────────────
+  // The demo pair prices ROBIN at 0.000000112 ETH, so 1 ETH buys
+  // 8,928,571.4 ROBIN at mid. The Pons hook takes 4%, leaving 8,571,428.6.
+  const amtIn = d.querySelector('#amtIn'), amtOut = d.querySelector('#amtOut');
+  amtIn.value = '1';
+  amtIn.dispatchEvent(new win.Event('input', { bubbles: true }));
+
+  const gross = 1 / 0.000000112;
+  const net = gross * (1 - win.ROBIN.swap.feePct / 100);
+  check('quote subtracts the pool fee', amtOut.value === '8.57M',
+    `${amtOut.value} (gross would be 8.93M, net ${(net/1e6).toFixed(2)}M)`);
+  check('fee row shows the total', t('#mFee') === '4%', t('#mFee'));
+
+  // minimum received must sit below the fee-adjusted quote, not the mid-price
+  const minTxt = t('#mMin').replace(/[^0-9.]/g, '');
+  const minVal = parseFloat(minTxt) * 1e6;
+  check('minimum received is below the net quote', minVal < net && minVal > net * 0.9,
+    `${t('#mMin')} vs net ${(net/1e6).toFixed(2)}M`);
+  check('minimum received is below the gross quote too', minVal < gross,
+    `${minVal} vs gross ${gross}`);
+
+  // the low slippage steps are only usable because the fee is handled separately
+  const slips = [...d.querySelectorAll('#slip button')].map(b => b.textContent);
+  check('slippage steps no longer have to absorb the fee',
+    slips.join(',') === '1%,2%,5%,10%', slips.join(','));
+
   check('no script errors', errors.length === 0, errors.join(' | '));
 
   console.log(`\n${pass} passed, ${fail} failed`);

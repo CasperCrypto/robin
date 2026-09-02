@@ -142,7 +142,7 @@
     rate: $('#mRate'), min: $('#mMin'),
     btn: $('#swapBtn'), note: $('#swapNote'),
     dot: $('#netDot'), label: $('#netLabel'),
-    slip: $('#slip'), presets: $('#presets'),
+    slip: $('#slip'), presets: $('#presets'), fee: $('#mFee'),
     flip: $('#flipBtn'), max: $('#maxBtn')
   };
 
@@ -172,10 +172,25 @@
     return { ethPerRobin: ethPerRobin, usdPerRobin: usdPerRobin, usdPerEth: usdPerEth };
   }
 
+  /** Fee the pool's hook takes, as a multiplier on the output. */
+  function feeMult() {
+    var f = Number(C.swap.feePct) || 0;
+    return 1 - Math.min(Math.max(f, 0), 50) / 100;
+  }
+
+  /**
+   * Expected output at the current mid-price, after the hook's fee.
+   *
+   * DexScreener reports the pool mid-price, which knows nothing about the
+   * Pons hook, so the raw figure is optimistic by exactly the fee. Subtract it
+   * here and every downstream number — the estimate, the fiat line, and the
+   * minimum-received that guards the trade — is honest.
+   */
   function quote(amountIn) {
     var p = prices();
     if (!p || !amountIn || amountIn <= 0) return null;
-    return S.dir === 'buy' ? amountIn / p.ethPerRobin : amountIn * p.ethPerRobin;
+    var gross = S.dir === 'buy' ? amountIn / p.ethPerRobin : amountIn * p.ethPerRobin;
+    return gross * feeMult();
   }
 
   /* --------------------------------------------------------------- render */
@@ -213,6 +228,11 @@
     el.min.textContent = out
       ? RB.num(out * (1 - S.slippage / 100), 4) + ' ' + (buy ? 'ROBIN' : 'ETH')
       : '—';
+
+    if (el.fee) {
+      var f = Number(C.swap.feePct) || 0;
+      el.fee.textContent = f ? f + '%' : 'None';
+    }
 
     // balances
     var bE = S.bal.eth != null ? RB.fromUnits(S.bal.eth, 18) : null;
@@ -273,7 +293,7 @@
   });
 
   // slippage picker
-  [0.5, 1, 5, 10].forEach(function (v) {
+  [1, 2, 5, 10].forEach(function (v) {
     var b = document.createElement('button');
     b.type = 'button';
     b.textContent = v + '%';

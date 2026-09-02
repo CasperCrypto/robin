@@ -72,7 +72,17 @@ window.ROBIN = {
       hooks:       ''
     },
 
-    slippageDefault: 5,           // percent
+    /* Total fee taken out of every swap by the Pons hook on the V4 pool,
+     * as a percentage. This is the creator fee plus the protocol share — the
+     * figure a trader actually loses, not the LP fee tier.
+     *
+     * It matters here because the quote comes from the pool's mid-price, which
+     * does not know about the hook. Without subtracting it the panel would
+     * promise ~4% more than the pool pays out, and every swap under a 4%
+     * slippage tolerance would revert. Set it to 0 for an untaxed token. */
+    feePct: 4,
+
+    slippageDefault: 2,           // percent, on top of feePct
     presets:        [0.01, 0.05, 0.1, 0.5]   // quick-buy amounts in ETH
   },
 
