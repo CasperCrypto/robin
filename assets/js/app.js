@@ -253,80 +253,79 @@
   /* --------------------------------------------------------------- footer */
   $('#yr').textContent = new Date().getFullYear();
 
-  /* -------------------------------------------------- X timeline embed */
+  /* ------------------------------------------------------- X / Twitter */
   /*
-     X's widget is loaded from platform.twitter.com and is blocked outright by
-     many privacy extensions, some networks, and any tracking-protection
-     setting. It also renders nothing for a protected or empty account. So the
-     card starts as a proper Follow card and is only replaced once a real
-     timeline iframe actually appears — rather than sitting on "Loading…"
-     forever when it never will.
+     Timelines are the unreliable bit: the widget is blocked by many privacy
+     extensions and renders nothing for a protected account. Individual posts
+     embed far more dependably, so the section shows the posts you name in the
+     config, with a follow card that stands on its own if X never loads.
   */
   var handle = (C.twitterHandle || '').replace(/^@/, '');
+  var tweets = Array.isArray(C.tweets) ? C.tweets.filter(Boolean) : [];
   var twBox = $('#twEmbed');
 
-  function followCard() {
-    if (!twBox) return;
+  function followCard(compact) {
     var url = handle ? 'https://x.com/' + handle : (C.links.twitter || '#');
-    twBox.innerHTML =
-      '<div class="tw-fallback">' +
+    return '<div class="tw-follow' + (compact ? ' compact' : '') + '">' +
         '<div class="tw-x" aria-hidden="true">𝕏</div>' +
         (handle ? '<div class="tw-handle">@' + esc(handle) + '</div>' : '') +
-        '<p>Charts, memes and every announcement first. ' +
-        'Robin posts more than he should.</p>' +
+        '<p>Charts, memes and every announcement first.</p>' +
         '<a class="btn btn-lime" href="' + esc(url) + '" target="_blank" rel="noopener">' +
           'Follow on X</a>' +
       '</div>';
   }
 
-  if (!handle) {
-    followCard();
-  } else {
-    followCard();   // shown immediately; replaced only if the widget really loads
+  if (twBox) {
+    if (!tweets.length) {
+      twBox.innerHTML = followCard(false);
+    } else {
+      // Blockquote is the documented markup; widgets.js upgrades it in place,
+      // and if the script never arrives the quote is still a working link.
+      twBox.innerHTML =
+        '<div class="tw-posts" id="twPosts">' +
+          tweets.slice(0, 3).map(function (id) {
+            var u = 'https://twitter.com/' + esc(handle || 'i') + '/status/' + esc(id);
+            return '<blockquote class="twitter-tweet" data-theme="dark" data-dnt="true">' +
+                     '<a href="' + u + '">View this post on X</a>' +
+                   '</blockquote>';
+          }).join('') +
+        '</div>' +
+        followCard(true);
 
-    var mount = document.createElement('div');
-    mount.className = 'tw-mount';
-    mount.style.display = 'none';
-    var a = document.createElement('a');
-    a.className = 'twitter-timeline';
-    a.setAttribute('data-theme', 'dark');
-    a.setAttribute('data-height', '420');
-    a.setAttribute('data-chrome', 'noheader nofooter transparent');
-    a.href = 'https://twitter.com/' + handle;
-    a.textContent = 'Posts by @' + handle;
-    mount.appendChild(a);
-    twBox.appendChild(mount);
+      var posts = $('#twPosts');
+      posts.classList.add('loading');
 
-    var settled = false;
-    var giveUpAt = Date.now() + 12000;
+      var done = false;
+      var deadline = Date.now() + 12000;
+      var poll = setInterval(function () {
+        if (done) { clearInterval(poll); return; }
+        if (posts.querySelector('iframe')) {
+          done = true;
+          clearInterval(poll);
+          posts.classList.remove('loading');
+          posts.classList.add('ready');
+        } else if (Date.now() > deadline) {
+          done = true;
+          clearInterval(poll);
+          // X never showed up: drop the quotes and let the follow card carry it.
+          posts.remove();
+          var fc = twBox.querySelector('.tw-follow');
+          if (fc) fc.classList.remove('compact');
+        }
+      }, 400);
 
-    // Poll rather than trusting one timer: the widget can take a while on a
-    // cold cache, and script.onload fires well before it has rendered.
-    var check = setInterval(function () {
-      if (settled) { clearInterval(check); return; }
-      var frame = mount.querySelector('iframe');
-      if (frame && frame.offsetHeight > 80) {
-        settled = true;
-        clearInterval(check);
-        var fb = twBox.querySelector('.tw-fallback');
-        if (fb) fb.remove();
-        mount.style.display = '';
-      } else if (Date.now() > giveUpAt) {
-        settled = true;
-        clearInterval(check);
-        mount.remove();          // keep the Follow card, drop the dead mount
-      }
-    }, 400);
-
-    var sc = document.createElement('script');
-    sc.src = 'https://platform.twitter.com/widgets.js';
-    sc.async = true;
-    sc.charset = 'utf-8';
-    sc.onerror = function () {
-      settled = true;
-      clearInterval(check);
-      mount.remove();
-    };
-    document.body.appendChild(sc);
+      var sc = document.createElement('script');
+      sc.src = 'https://platform.twitter.com/widgets.js';
+      sc.async = true;
+      sc.charset = 'utf-8';
+      sc.onerror = function () {
+        done = true;
+        clearInterval(poll);
+        posts.remove();
+        var fc = twBox.querySelector('.tw-follow');
+        if (fc) fc.classList.remove('compact');
+      };
+      document.body.appendChild(sc);
+    }
   }
 })();

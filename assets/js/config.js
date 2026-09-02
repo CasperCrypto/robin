@@ -121,8 +121,20 @@ window.ROBIN = {
     github:    ''
   },
 
-  // X/Twitter handle for the live timeline embed (no @). Leave '' to hide it.
+  // X/Twitter handle (no @) for the follow card and post links.
   twitterHandle: 'shopping_io',
+
+  /* Specific posts to embed, newest first. Single-post embeds are far more
+   * reliable than a timeline widget, which many privacy extensions block and
+   * which renders nothing for a protected account.
+   * Paste the numeric id from the end of a post URL:
+   *   https://x.com/shopping_io/status/2094873068577398821  ->  '2094873068577398821'
+   * Leave the array empty to show only the follow card. */
+  tweets: [
+    '2095112279188541614',
+    '2094873068577398821',
+    '2094865776071114838'
+  ],
 
   /* --------------------------------------------------------------- supply */
   // Verifiable facts, not a made-up percentage split. Each is something a

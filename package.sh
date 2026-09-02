@@ -8,21 +8,39 @@ mkdir -p dist
 cp -r index.html assets api README.md dist/
 cp .htaccess dist/
 
+# Cache-bust: stamp every stylesheet and script with this build's id, so a
+# re-upload is picked up immediately instead of being served from cache for an
+# hour. This is why "I replaced the files and nothing changed" happens.
+BUILD="$(date +%Y%m%d%H%M)"
+sed -i -E "s|(href=\"assets/css/[^\"?]+)\"|\1?v=$BUILD\"|g; s|(src=\"assets/js/[^\"?]+)\"|\1?v=$BUILD\"|g" dist/index.html
+echo "build id $BUILD stamped on $(grep -c "?v=$BUILD" dist/index.html) asset urls"
+
 # forge-sample.webp exists only so the offline preview has something to show.
 rm -f dist/assets/img/forge-sample.webp
 
-# Ship the config file ready to edit, never with a key in it.
-cat > dist/api/config.php <<'PHP'
+# The API key is injected from the environment at package time, never stored
+# in this script or the repository:
+#     ROBIN_AI_KEY=sk-... ./package.sh
+# With no key set, the file ships empty and ready to edit.
+KEY="${ROBIN_AI_KEY:-}"
+cat > dist/api/config.php <<PHP
 <?php
 /**
- * Paste your Concentrate.ai (or other provider) API key between the quotes,
- * save, and upload. That is the only thing the meme forge needs.
+ * API key for the meme forge.
  *
- * This file is git-ignored and blocked from the web by .htaccess. If your key
- * has ever been pasted into a chat, an email or a screenshot, rotate it first.
+ * SECURITY: if this key has ever been pasted into a chat, an email or a
+ * screenshot, rotate it at your provider and replace the value below. This
+ * file is blocked from the web by .htaccess and is git-ignored, but a key that
+ * has already been shared is already public.
  */
-return ['ROBIN_AI_KEY' => ''];
+return ['ROBIN_AI_KEY' => '${KEY}'];
 PHP
+
+if [ -n "$KEY" ]; then
+  echo "api/config.php written WITH a key (${#KEY} chars) — rotate it if it has been shared"
+else
+  echo "api/config.php written empty — paste your key into it before uploading"
+fi
 
 ( cd dist && zip -qr ../robin-site.zip . )
 echo "dist/ ready · $(find dist -type f | wc -l) files · $(du -sh robin-site.zip | cut -f1) zip"

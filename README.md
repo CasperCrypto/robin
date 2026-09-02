@@ -130,12 +130,14 @@ history after a reload or a quiet hour — the chain only serves a limited log
 window, and without this the section would look empty on a slow day.
 `market.feedRows` sets how many are displayed.
 
-**Connect wallet** — a picker rather than a guess. Wallets that announce
-themselves (EIP-6963) are listed by name and icon; one detected wallet connects
-straight away, several let the visitor choose. On a phone, where wallets are
-apps and nothing is injected, it offers MetaMask, Trust, Coinbase Wallet and
-Phantom — each link reopens the site inside that app's browser, where
-connecting is one tap. iPadOS is detected too, which reports itself as a Mac.
+**Connect wallet** — a picker rather than a guess, in up to three groups:
+wallets already in the browser (discovered via EIP-6963, listed with their own
+name and icon), **wallet apps** — MetaMask, Trust, Coinbase Wallet, Phantom —
+which are always offered because on a phone that is the only thing that works
+and on a desktop plenty of people keep their wallet on their phone, and browser
+extensions to install, shown only on desktop when nothing was found. Each app
+link reopens the site inside that wallet's own browser, where connecting is one
+tap. iPadOS is detected too, which reports itself as a Mac.
 
 **Swap** — deliberately plain: amount in, amount out, buy. The slippage control
 is hidden because the quote already accounts for the pool fee and there is
@@ -149,19 +151,27 @@ received at your slippage. See below for the two execution modes.
 it, drawn from your real artwork so the character stays on-model. Download, copy,
 or post straight to X.
 
-**Community** — the X timeline is attempted, but that widget is blocked by many
-privacy extensions and renders nothing for a protected account, so the card
-starts as a proper Follow card and is only replaced once a real timeline
-actually appears. It never sits on "Loading…".
+**Community** — the three posts named in `config.tweets` are embedded
+individually, which is far more reliable than a timeline widget: timelines are
+blocked by many privacy extensions and render nothing at all for a protected
+account. A follow card sits alongside them, and takes over entirely if X never
+loads. To change which posts appear, paste the numeric id from the end of a post
+URL into `tweets`, newest first.
 
 ---
 
 ## The meme forge (AI image generation)
 
 One AI feature: a visitor describes a scene, and the site returns a picture of
-Robin in it. The prompt is wrapped server-side with a house style, and **your
-`robin-logo.png` is attached as a reference image on every call**, so the
-generated dog is always your dog — same hat, same glasses, same art style.
+Robin in it.
+
+**How it stays on-model.** Nothing is trained or fine-tuned. On every single
+request the proxy attaches your `assets/img/robin-logo.png` as a reference
+image alongside the prompt, and the house style (flat cel shading, brand lime,
+square, no lettering) is applied server-side where visitors cannot edit it out.
+The model conditions on that reference, so the dog keeps his hat and glasses
+instead of drifting into a generic shiba. Each generation is a new image — the
+character is consistent, the scene is not.
 
 Visitors can download the result, copy it to the clipboard, or open X with the
 caption pre-filled.

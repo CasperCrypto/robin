@@ -138,8 +138,14 @@ setTimeout(() => {
   check('feed heading says buys', /Live buys/.test(d.querySelector('.feed-head h3')?.textContent || ''));
   check('slippage row hidden by default',
     d.querySelector('#slip')?.closest('.row')?.style.display === 'none');
-  check('X follow card rendered without the widget',
-    !!d.querySelector('#twEmbed .tw-fallback') &&
+  check('three posts embedded', d.querySelectorAll('#twPosts blockquote').length === 3,
+    'got ' + d.querySelectorAll('#twPosts blockquote').length);
+  check('each post links to the real status',
+    [...d.querySelectorAll('#twPosts blockquote a')].every(a =>
+      /^https:\/\/twitter\.com\/shopping_io\/status\/\d{10,}$/.test(a.href)),
+    d.querySelector('#twPosts blockquote a')?.href);
+  check('follow card stands alongside them',
+    !!d.querySelector('#twEmbed .tw-follow') &&
     /shopping_io/.test(d.querySelector('#twEmbed')?.textContent || ''));
   check('buy history is remembered', win.ROBIN.market.feedRows === 12);
   check('buy bar shows live price', /\$0\.000/.test(t('#bbPrice')), t('#bbPrice'));

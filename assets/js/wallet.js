@@ -170,50 +170,67 @@
     'stroke-width="1.9" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2"/>' +
     '<rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="16.5" cy="13" r="1.4"/></svg>';
 
+  function group(title) {
+    var h = document.createElement('div');
+    h.className = 'wgroup';
+    h.textContent = title;
+    listEl.appendChild(h);
+  }
+
   function openSheet() {
     buildSheet();
     var found = available();
     listEl.innerHTML = '';
 
+    // 1. Anything already injected in this browser.
     if (found.length) {
+      group(found.length > 1 ? 'Wallets in this browser' : 'Detected');
       found.forEach(function (d) {
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'wrow';
         b.innerHTML = row(d.info.name,
           d.info.icon ? '<img src="' + RB.esc(d.info.icon) + '" alt="" width="22" height="22">' : GENERIC,
-          'Detected');
+          'Connect');
         b.addEventListener('click', function () {
           closeSheet();
           connectWith(d.provider);
         });
         listEl.appendChild(b);
       });
-      noteEl.textContent = 'Approve the connection in your wallet. This site never sees your keys.';
-    } else if (isMobile()) {
-      deepLinks().forEach(function (w) {
-        var a = document.createElement('a');
-        a.className = 'wrow';
-        a.href = w.url;
-        a.rel = 'noopener';
-        a.innerHTML = row(w.name, GENERIC, 'Opens the app');
-        listEl.appendChild(a);
-      });
-      noteEl.textContent = 'Pick your wallet app — it reopens this page inside it, ' +
-        'where connecting takes one tap.';
-    } else {
+    }
+
+    // 2. Wallet apps. Always offered — on a phone this is the only thing that
+    //    works, and on a desktop plenty of people keep their wallet on their
+    //    phone and scan or continue there.
+    group(found.length ? 'Or open in a wallet app' : 'Open in your wallet app');
+    deepLinks().forEach(function (w) {
+      var a = document.createElement('a');
+      a.className = 'wrow';
+      a.href = w.url;
+      a.rel = 'noopener';
+      if (!isMobile()) a.target = '_blank';
+      a.innerHTML = row(w.name, GENERIC, isMobile() ? 'Opens the app' : 'Continue on phone');
+      listEl.appendChild(a);
+    });
+
+    // 3. Extensions, only where one could actually be installed.
+    if (!found.length && !isMobile()) {
+      group('Or install a browser wallet');
       INSTALL.forEach(function (w) {
         var a = document.createElement('a');
-        a.className = 'wrow';
+        a.className = 'wrow wrow-sm';
         a.href = w.url;
         a.target = '_blank';
         a.rel = 'noopener';
         a.innerHTML = row(w.name, GENERIC, 'Install');
         listEl.appendChild(a);
       });
-      noteEl.textContent = 'No wallet found in this browser. Install one, then come back ' +
-        'and press Connect.';
     }
+
+    noteEl.textContent = found.length
+      ? 'Approve the connection in your wallet. This site never sees your keys.'
+      : 'Pick your wallet — it reopens this page inside the app, where connecting takes one tap.';
 
     lastFocus = document.activeElement;
     sheet.hidden = false;
