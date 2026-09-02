@@ -32,6 +32,13 @@ header('Cache-Control: no-store');
  */
 const API_ROOT   = 'https://api.concentrate.ai/api/v1';
 
+/**
+ * How the key is sent. 'bearer' suits most providers; run
+ * api/ai.php?selftest=1&probe=1 if yours rejects it.
+ * One of: 'bearer' | 'x-api-key' | 'raw' | 'api-key'
+ */
+const AUTH_STYLE = 'bearer';
+
 /** Endpoint paths appended to API_ROOT. */
 const PATH_CHAT   = '/chat/completions';
 const PATH_MODELS = '/models';
@@ -48,6 +55,16 @@ function fail(int $code, string $msg): void {
     http_response_code($code);
     echo json_encode(['error' => $msg]);
     exit;
+}
+
+/** The auth header for this provider, per AUTH_STYLE. */
+function authHeader(string $key): string {
+    switch (AUTH_STYLE) {
+        case 'x-api-key': return 'x-api-key: ' . $key;
+        case 'raw':       return 'Authorization: ' . $key;
+        case 'api-key':   return 'api-key: ' . $key;
+        default:          return 'Authorization: Bearer ' . $key;
+    }
 }
 
 function apiKey(): string {
@@ -95,10 +112,91 @@ if (isset($_GET['selftest'])) {
     }
     $line('KEY        found (' . substr($key, 0, 8) . '…, ' . strlen($key) . ' chars)');
     $line('API ROOT   ' . API_ROOT);
+    $line('AUTH       ' . AUTH_STYLE);
     $line('MODEL      ' . MODEL);
     $line('PHP        ' . PHP_VERSION . (function_exists('curl_init') ? ', cURL ok' : ', cURL MISSING'));
     $line('REF IMAGE  ' . (is_readable(REF_IMAGE) ? 'ok' : 'NOT READABLE at ' . REF_IMAGE));
     $line();
+
+    /* ── probe mode ───────────────────────────────────────────────────
+       Add &probe=1 when the key is being rejected. Providers differ in both
+       the API root and the auth header they expect, and a wrong root often
+       answers 401 rather than 404 — indistinguishable from a bad key. This
+       tries the plausible combinations and prints what each one actually
+       said, so the right pair is obvious rather than guessed at. */
+    if (isset($_GET['probe'])) {
+        $roots = [
+            API_ROOT,
+            'https://api.concentrate.ai/v1',
+            'https://api.concentrate.ai',
+            'https://concentrate.ai/api/v1',
+            'https://concentrate.ai/v1',
+        ];
+        $auths = [
+            'Authorization: Bearer'  => function ($k) { return ['Authorization: Bearer ' . $k]; },
+            'x-api-key'              => function ($k) { return ['x-api-key: ' . $k]; },
+            'Authorization: raw'     => function ($k) { return ['Authorization: ' . $k]; },
+            'api-key'                => function ($k) { return ['api-key: ' . $k]; },
+        ];
+
+        $line('--- probing roots x auth styles against /models ---');
+        $line('(looking for one that answers 200)');
+        $line();
+        $winner = null;
+
+        foreach (array_unique($roots) as $root) {
+            foreach ($auths as $label => $mk) {
+                $ch = curl_init(rtrim($root, '/') . PATH_MODELS);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 15,
+                    CURLOPT_HTTPHEADER => array_merge($mk($key), ['Accept: application/json']),
+                ]);
+                $raw  = curl_exec($ch);
+                $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $cerr = curl_error($ch);
+                curl_close($ch);
+
+                $tag = str_pad($code ?: 'ERR', 4);
+                $note = '';
+                if ($raw === false) {
+                    $note = $cerr;
+                } else {
+                    $j = json_decode((string)$raw, true);
+                    $note = $j['error']['message']
+                        ?? $j['message']
+                        ?? $j['detail']
+                        ?? (is_array($j) ? '' : substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 90));
+                    if ($code === 200 && !$winner) {
+                        $winner = ['root' => $root, 'auth' => $label];
+                        $n = is_array($j['data'] ?? null) ? count($j['data']) : '?';
+                        $note = 'OK — ' . $n . ' models';
+                    }
+                }
+                $line('  ' . $tag . ' ' . str_pad($label, 22) . ' ' . $root);
+                if ($note !== '') $line('       ' . substr((string)$note, 0, 150));
+            }
+        }
+
+        $line();
+        if ($winner) {
+            $line('>>> WORKING COMBINATION FOUND');
+            $line('    API root : ' . $winner['root']);
+            $line('    Auth     : ' . $winner['auth']);
+            $line();
+            $line('    Set API_ROOT at the top of api/ai.php to that root.');
+            if ($winner['auth'] !== 'Authorization: Bearer') {
+                $line('    Also set AUTH_STYLE to: ' . $winner['auth']);
+            }
+        } else {
+            $line('>>> Nothing answered 200.');
+            $line('    Every combination was refused, so the key itself is the most likely');
+            $line('    problem — check it is active and has credit at your provider. If the');
+            $line('    messages above mention an unknown path, the API root is different');
+            $line('    from all five tried; take it from your provider docs and set API_ROOT.');
+        }
+        exit;
+    }
 
     // ── can we list models? ──────────────────────────────────────────────
     $line('--- ' . API_ROOT . PATH_MODELS . ' ---');
@@ -106,7 +204,7 @@ if (isset($_GET['selftest'])) {
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 30,
-        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Accept: application/json'],
+        CURLOPT_HTTPHEADER => [authHeader($key), 'Accept: application/json'],
     ]);
     $raw  = curl_exec($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -172,7 +270,7 @@ if (isset($_GET['selftest'])) {
                 'modalities' => ['image', 'text'],
                 'messages' => [['role' => 'user', 'content' => $content]],
             ]),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $key],
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', authHeader($key)],
         ]);
         $raw  = curl_exec($ch);
         $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -301,7 +399,7 @@ curl_setopt_array($ch, [
     CURLOPT_POSTFIELDS => json_encode($payload),
     CURLOPT_HTTPHEADER => [
         'Content-Type: application/json',
-        'Authorization: Bearer ' . $key,
+        authHeader($key),
         'HTTP-Referer: ' . $origin,
         'X-Title: ROBIN Meme Forge',
     ],
@@ -317,7 +415,12 @@ $j = json_decode((string)$res, true);
 if ($code !== 200) {
     $m = $j['error']['message'] ?? 'Upstream error';
     error_log('[robin-forge] ' . $code . ': ' . $m);
-    if ($code === 401 || $code === 403) fail(502, 'The API key was rejected — check ROBIN_AI_KEY.');
+    if ($code === 401 || $code === 403) {
+        // A wrong API root often answers 401 too, so do not blame the key alone.
+        fail(502, 'The image service refused the request. (Owner: run '
+                . 'api/ai.php?selftest=1&probe=1 — it tries every API root and auth '
+                . 'header and prints which one works.)');
+    }
     if ($code === 429) fail(429, 'The image service is rate-limiting us. Try again shortly.');
     fail(502, 'The image service is busy. Try again in a moment.');
 }

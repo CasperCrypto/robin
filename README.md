@@ -211,11 +211,27 @@ Read the report top to bottom; it names the fix for each failure:
 
 | What it says | What to do |
 |---|---|
-| `KEY MISSING` | Set `ROBIN_AI_KEY`, or create `api/config.php` |
-| `HTTP 401` / `403` | The key was rejected — check it is active |
-| `HTTP 404` on `/models` | Your API root differs — change `API_ROOT` at the top of `api/ai.php` |
+| `KEY MISSING` | Set `ROBIN_AI_KEY`, or fill in `api/config.php` |
+| `HTTP 401` / `403` | Run the probe below — it may be the API root, not the key |
+| `HTTP 404` on `/models` | Your API root differs — change `API_ROOT` in `api/ai.php` |
 | `CONNECT tunnel failed` | Your host blocks outbound HTTPS — ask them to allow it |
 | `RESULT NO IMAGE` + text | You pointed at a text model; pick one from the list it printed |
+
+### When the key is "rejected"
+
+```
+https://shopping.io/robin/api/ai.php?selftest=1&probe=1
+```
+
+A rejected key and a wrong API root look identical from the outside — plenty of
+gateways answer `401` for a path they do not recognise. The probe tries every
+plausible API root against every common auth header (`Authorization: Bearer`,
+`x-api-key`, a raw `Authorization`, `api-key`) and prints the exact status and
+the provider's own error text for each.
+
+If one answers `200` it says so explicitly, with the root and auth style to
+copy into `API_ROOT` and `AUTH_STYLE` at the top of `api/ai.php`. If nothing
+answers, the key itself is the problem — check it is active and funded.
 
 ### Picking a model
 
