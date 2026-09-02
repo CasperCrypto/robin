@@ -40,8 +40,19 @@ const API_ROOT   = 'https://api.concentrate.ai/api/v1';
 const AUTH_STYLE = 'bearer';
 
 /** Endpoint paths appended to API_ROOT. */
-const PATH_CHAT   = '/chat/completions';
-const PATH_MODELS = '/models';
+const PATH_RESPONSES = '/responses';
+const PATH_CHAT      = '/chat/completions';
+const PATH_MODELS    = '/models';
+
+/**
+ * Which API shape this provider speaks.
+ *   'responses' — POST /responses with `input` and an image_generation tool
+ *                 (what a "Create response" endpoint in the docs means)
+ *   'chat'      — POST /chat/completions with `messages` and `modalities`
+ *   'auto'      — try 'responses', fall back to 'chat' if the path is missing
+ * Run api/ai.php?selftest=1&probe=1 to see which one your provider has.
+ */
+const API_SHAPE = 'auto';
 
 const MODEL      = 'google/gemini-2.5-flash-image';
 const REF_IMAGE  = __DIR__ . '/../assets/img/robin-logo.png';
@@ -178,6 +189,31 @@ if (isset($_GET['selftest'])) {
             }
         }
 
+        // Which endpoints exist? A GET on a POST-only path answers 405 if it is
+        // there and 404 if it is not — a free existence check.
+        if ($winner) {
+            $line();
+            $line('--- endpoints at ' . $winner['root'] . ' ---');
+            foreach ([PATH_RESPONSES, PATH_CHAT] as $path) {
+                $ch = curl_init(rtrim($winner['root'], '/') . $path);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 15,
+                    CURLOPT_HTTPHEADER => [authHeader($key), 'Accept: application/json'],
+                ]);
+                curl_exec($ch);
+                $c = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                $verdict = ($c === 404) ? 'NOT present'
+                         : (($c === 405 || $c === 400 || $c === 422) ? 'present' : 'HTTP ' . $c);
+                $line('  ' . str_pad($path, 20) . $verdict);
+                if ($verdict === 'present') {
+                    $line('       -> set API_SHAPE to \''
+                        . ($path === PATH_RESPONSES ? 'responses' : 'chat') . '\'');
+                }
+            }
+        }
+
         $line();
         if ($winner) {
             $line('>>> WORKING COMBINATION FOUND');
@@ -259,40 +295,42 @@ if (isset($_GET['selftest'])) {
     if (isset($_GET['image'])) {
         $line();
         $line('--- live image test (this costs one generation) ---');
-        $content = [['type' => 'text', 'text' => 'Draw a simple green circle on a white background.']];
-        $ch = curl_init(API_ROOT . PATH_CHAT);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 120,
-            CURLOPT_POSTFIELDS => json_encode([
-                'model' => MODEL,
-                'modalities' => ['image', 'text'],
-                'messages' => [['role' => 'user', 'content' => $content]],
-            ]),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json', authHeader($key)],
-        ]);
-        $raw  = curl_exec($ch);
-        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        $line('HTTP       ' . $code);
-        $j = json_decode((string)$raw, true);
-        $img = extractImage(is_array($j) ? $j : []);
-        if ($img) {
-            $line('RESULT     an image came back (' . strlen($img) . ' chars of data URL)');
-            $line();
-            $line('Everything works. The meme forge is ready.');
-        } else {
-            $said = $j['choices'][0]['message']['content'] ?? '';
-            $line('RESULT     NO IMAGE');
-            if (is_string($said) && $said !== '') {
-                $line('           The model replied with text instead:');
-                $line('           "' . substr(trim($said), 0, 200) . '"');
-                $line('           That means it is a text model. Pick an image model above.');
-            } else {
-                $line('           Raw response, first 500 chars:');
-                $line('           ' . substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 500));
+        $prompt = 'Draw a simple flat green circle on a white background.';
+        $order = API_SHAPE === 'chat' ? ['chat'] : ['responses'];
+        if (API_SHAPE === 'auto') $order[] = 'chat';
+
+        foreach ($order as $shape) {
+            $path = $shape === 'responses' ? PATH_RESPONSES : PATH_CHAT;
+            $payload = $shape === 'responses'
+                ? bodyResponses(MODEL, $prompt, null)
+                : bodyChat(MODEL, $prompt, null);
+            [$code, $j, $raw, $cerr] = post(API_ROOT . $path, $key, $payload, 120);
+
+            $line(strtoupper($shape) . ' ' . API_ROOT . $path . '  ->  HTTP ' . ($code ?: 'ERR'));
+            if ($raw === false) { $line('           ' . $cerr); break; }
+
+            if ($code === 404 || $code === 405) {
+                $line('           endpoint not present here; trying the next shape');
+                continue;
             }
+
+            $img = extractImage(is_array($j) ? $j : []);
+            if ($img) {
+                $line('RESULT     an image came back (' . strlen($img) . ' chars)');
+                $line();
+                $line('Everything works. Set API_SHAPE to \'' . $shape . '\' to skip the probing.');
+            } else {
+                $err = $j['error']['message'] ?? $j['message'] ?? '';
+                $said = is_string($j['choices'][0]['message']['content'] ?? null)
+                      ? $j['choices'][0]['message']['content'] : '';
+                $line('RESULT     NO IMAGE');
+                if ($err)  $line('           provider said: ' . substr($err, 0, 220));
+                if ($said) $line('           model replied with text: "' . substr(trim($said), 0, 160) . '"');
+                if (!$err && !$said) {
+                    $line('           raw: ' . substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 400));
+                }
+            }
+            break;
         }
     } else {
         $line();
@@ -302,10 +340,75 @@ if (isset($_GET['selftest'])) {
 }
 
 /**
+ * Build the request body for the Responses API: a single user turn carrying
+ * the prompt and the reference artwork, with image generation offered as a
+ * tool the model can call.
+ */
+function bodyResponses(string $model, string $text, ?string $refDataUrl): array {
+    $content = [['type' => 'input_text', 'text' => $text]];
+    if ($refDataUrl) {
+        $content[] = ['type' => 'input_image', 'image_url' => $refDataUrl];
+    }
+    return [
+        'model' => $model,
+        'input' => [['role' => 'user', 'content' => $content]],
+        'tools' => [['type' => 'image_generation']],
+    ];
+}
+
+/** Build the request body for the Chat Completions API. */
+function bodyChat(string $model, string $text, ?string $refDataUrl): array {
+    $content = [['type' => 'text', 'text' => $text]];
+    if ($refDataUrl) {
+        $content[] = ['type' => 'image_url', 'image_url' => ['url' => $refDataUrl]];
+    }
+    return [
+        'model' => $model,
+        'modalities' => ['image', 'text'],
+        'messages' => [['role' => 'user', 'content' => $content]],
+    ];
+}
+
+/** One POST, returning [httpCode, decodedJson, rawBody, curlError]. */
+function post(string $url, string $key, array $payload, int $timeout = TIMEOUT): array {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_POSTFIELDS => json_encode($payload),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json', authHeader($key)],
+    ]);
+    $raw  = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+    return [$code, json_decode((string)$raw, true), $raw, $err];
+}
+
+/**
  * Providers differ in where they put a generated image, so accept the common
  * shapes rather than betting on one. Returns a data/https URL, or null.
  */
 function extractImage(array $j): ?string {
+    // Responses API: an image_generation_call carries base64 in `result`.
+    if (is_array($j['output'] ?? null)) {
+        foreach ($j['output'] as $item) {
+            if (!is_array($item)) continue;
+            if (($item['type'] ?? '') === 'image_generation_call' && !empty($item['result'])) {
+                return 'data:image/png;base64,' . $item['result'];
+            }
+            if (is_array($item['content'] ?? null)) {
+                foreach ($item['content'] as $part) {
+                    if (($part['type'] ?? '') === 'output_image' && !empty($part['image_url'])) {
+                        return $part['image_url'];
+                    }
+                    if (!empty($part['image_url']['url'])) return $part['image_url']['url'];
+                }
+            }
+        }
+    }
+
     $msg = $j['choices'][0]['message'] ?? [];
     if (!empty($msg['images'][0]['image_url']['url'])) return $msg['images'][0]['image_url']['url'];
     if (!empty($msg['images'][0]['url']))              return $msg['images'][0]['url'];
@@ -369,64 +472,57 @@ $style = "You are illustrating official artwork for the \$ROBIN (Robin Nakamoto)
     . "- Nothing hateful, sexual, or depicting real people.\n\n"
     . "SCENE: " . $prompt;
 
-$content = [['type' => 'text', 'text' => $style]];
-
-// attach the reference artwork so the dog stays on-model
+// Reference artwork, so the generated dog is always this dog.
+$ref = null;
 if (is_readable(REF_IMAGE)) {
     $raw = @file_get_contents(REF_IMAGE);
     if ($raw !== false && strlen($raw) < 6_000_000) {
-        $content[] = [
-            'type' => 'image_url',
-            'image_url' => ['url' => 'data:image/png;base64,' . base64_encode($raw)],
-        ];
+        $ref = 'data:image/png;base64,' . base64_encode($raw);
     }
 }
 
-$payload = [
-    'model'      => (string)($body['model'] ?? '') ?: MODEL,
-    'modalities' => ['image', 'text'],
-    'messages'   => [['role' => 'user', 'content' => $content]],
-];
+$model = (string)($body['model'] ?? '') ?: MODEL;
 
-$origin = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://')
-        . ($_SERVER['HTTP_HOST'] ?? 'shopping.io');
+/* Try the configured shape; if that path simply is not there (404/405), try
+   the other one rather than failing on a guess about this provider's API. */
+$order = API_SHAPE === 'chat' ? ['chat'] : ['responses'];
+if (API_SHAPE === 'auto') $order[] = 'chat';
 
-$ch = curl_init(API_ROOT . PATH_CHAT);
-curl_setopt_array($ch, [
-    CURLOPT_POST => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT => TIMEOUT,
-    CURLOPT_POSTFIELDS => json_encode($payload),
-    CURLOPT_HTTPHEADER => [
-        'Content-Type: application/json',
-        authHeader($key),
-        'HTTP-Referer: ' . $origin,
-        'X-Title: ROBIN Meme Forge',
-    ],
-]);
-$res  = curl_exec($ch);
-$code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$err  = curl_error($ch);
-curl_close($ch);
+$code = 0; $j = null; $rawBody = ''; $cerr = ''; $used = '';
 
-if ($res === false) fail(502, 'Could not reach the image service: ' . $err);
-$j = json_decode((string)$res, true);
+foreach ($order as $shape) {
+    $used = $shape;
+    if ($shape === 'responses') {
+        [$code, $j, $rawBody, $cerr] = post(API_ROOT . PATH_RESPONSES, $key,
+            bodyResponses($model, $style, $ref));
+    } else {
+        [$code, $j, $rawBody, $cerr] = post(API_ROOT . PATH_CHAT, $key,
+            bodyChat($model, $style, $ref));
+    }
+    if ($rawBody === false) break;                 // network failure, not a shape problem
+    if ($code !== 404 && $code !== 405) break;     // this endpoint exists; keep its answer
+}
+
+if ($rawBody === false) fail(502, 'Could not reach the image service: ' . $cerr);
 
 if ($code !== 200) {
-    $m = $j['error']['message'] ?? 'Upstream error';
-    error_log('[robin-forge] ' . $code . ': ' . $m);
+    $m = $j['error']['message'] ?? $j['message'] ?? 'Upstream error';
+    error_log('[robin-forge] ' . $used . ' ' . $code . ': ' . $m);
     if ($code === 401 || $code === 403) {
-        // A wrong API root often answers 401 too, so do not blame the key alone.
         fail(502, 'The image service refused the request. (Owner: run '
-                . 'api/ai.php?selftest=1&probe=1 — it tries every API root and auth '
-                . 'header and prints which one works.)');
+                . 'api/ai.php?selftest=1&probe=1 — it tries every API root, auth header '
+                . 'and endpoint shape and prints which one works.)');
     }
     if ($code === 429) fail(429, 'The image service is rate-limiting us. Try again shortly.');
+    if ($code === 404 || $code === 405) {
+        fail(502, 'No image endpoint found at the configured API root. '
+                . '(Owner: run api/ai.php?selftest=1&probe=1.)');
+    }
     fail(502, 'The image service is busy. Try again in a moment.');
 }
 
 // ── pull the image out of the response ────────────────────────────────────
-$url = extractImage($j);
+$url = extractImage(is_array($j) ? $j : []);
 
 // Only ever return something that is definitely an image. The response is
 // third-party text; a javascript: or data:text/html URL would end up in an

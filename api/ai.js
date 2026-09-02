@@ -12,7 +12,11 @@ import path from 'node:path';
 // Your provider's API root, no trailing slash, no endpoint path. If your docs
 // show a different root, this is the only line you need to change.
 const API_ROOT = 'https://api.concentrate.ai/api/v1';
+const PATH_RESPONSES = '/responses';
 const PATH_CHAT = '/chat/completions';
+
+// 'responses' | 'chat' | 'auto'  — see api/ai.php for what each means.
+const API_SHAPE = 'auto';
 const MODEL = 'google/gemini-2.5-flash-image';
 const MAX_PROMPT = 400;
 const RATE_MAX = 8;
@@ -59,8 +63,36 @@ Rules:
 
 SCENE: ${prompt}`;
 
+const bodyResponses = (model, text, ref) => ({
+  model,
+  input: [{ role: 'user', content: [
+    { type: 'input_text', text },
+    ...(ref ? [{ type: 'input_image', image_url: ref }] : []),
+  ] }],
+  tools: [{ type: 'image_generation' }],
+});
+
+const bodyChat = (model, text, ref) => ({
+  model,
+  modalities: ['image', 'text'],
+  messages: [{ role: 'user', content: [
+    { type: 'text', text },
+    ...(ref ? [{ type: 'image_url', image_url: { url: ref } }] : []),
+  ] }],
+});
+
 /** Providers differ slightly; accept the common response shapes. */
 function extractImage(j) {
+  // Responses API: an image_generation_call carries base64 in `result`.
+  for (const item of j?.output ?? []) {
+    if (item?.type === 'image_generation_call' && item.result) {
+      return 'data:image/png;base64,' + item.result;
+    }
+    for (const part of item?.content ?? []) {
+      if (part?.type === 'output_image' && part.image_url) return part.image_url;
+      if (part?.image_url?.url) return part.image_url.url;
+    }
+  }
   const msg = j?.choices?.[0]?.message ?? {};
   if (msg.images?.[0]?.image_url?.url) return msg.images[0].image_url.url;
   if (msg.images?.[0]?.url) return msg.images[0].url;
@@ -110,35 +142,48 @@ export default async function handler(req, res) {
   const prompt = String(body.prompt ?? '').trim().slice(0, MAX_PROMPT);
   if (!prompt) return json(400, { error: 'Tell it what to draw first.' });
 
-  const content = [{ type: 'text', text: styleFor(prompt) }];
   const ref = await referenceImage();
-  if (ref) content.push({ type: 'image_url', image_url: { url: ref } });
 
+  const model = String(body.model || '') || MODEL;
+  const shapes = API_SHAPE === 'chat' ? ['chat'] : ['responses'];
+  if (API_SHAPE === 'auto') shapes.push('chat');
+
+  let r, j, used;
   try {
-    const r = await fetch(API_ROOT + PATH_CHAT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-        'HTTP-Referer': `https://${req.headers.host || 'shopping.io'}`,
-        'X-Title': 'ROBIN Meme Forge',
-      },
-      body: JSON.stringify({
-        model: String(body.model || '') || MODEL,
-        modalities: ['image', 'text'],
-        messages: [{ role: 'user', content }],
-      }),
-      signal: AbortSignal.timeout(120_000),
-    });
+    for (const shape of shapes) {
+      used = shape;
+      const path = shape === 'responses' ? PATH_RESPONSES : PATH_CHAT;
+      const payload = shape === 'responses'
+        ? bodyResponses(model, styleFor(prompt), ref)
+        : bodyChat(model, styleFor(prompt), ref);
 
-    const j = await r.json();
+      r = await fetch(API_ROOT + path, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${key}`,
+          'HTTP-Referer': `https://${req.headers.host || 'shopping.io'}`,
+          'X-Title': 'ROBIN Meme Forge',
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(120_000),
+      });
+      j = await r.json().catch(() => ({}));
+      // Only keep looking when the endpoint itself is absent.
+      if (r.status !== 404 && r.status !== 405) break;
+    }
+
     if (!r.ok) {
-      console.error('[robin-forge]', r.status, j?.error?.message);
+      console.error('[robin-forge]', used, r.status, j?.error?.message);
       if (r.status === 401 || r.status === 403) {
-        return json(502, { error: 'The API key was rejected — check ROBIN_AI_KEY.' });
+        return json(502, { error: 'The image service refused the request. ' +
+          '(Owner: run the PHP self-test, or check API_ROOT and the auth header.)' });
       }
       if (r.status === 429) {
         return json(429, { error: 'The image service is rate-limiting us. Try again shortly.' });
+      }
+      if (r.status === 404 || r.status === 405) {
+        return json(502, { error: 'No image endpoint found at the configured API root.' });
       }
       return json(502, { error: 'The image service is busy. Try again in a moment.' });
     }

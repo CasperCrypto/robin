@@ -223,15 +223,41 @@ Read the report top to bottom; it names the fix for each failure:
 https://shopping.io/robin/api/ai.php?selftest=1&probe=1
 ```
 
-A rejected key and a wrong API root look identical from the outside — plenty of
+A rejected key and a wrong endpoint look identical from outside — plenty of
 gateways answer `401` for a path they do not recognise. The probe tries every
 plausible API root against every common auth header (`Authorization: Bearer`,
-`x-api-key`, a raw `Authorization`, `api-key`) and prints the exact status and
-the provider's own error text for each.
+`x-api-key`, a raw `Authorization`, `api-key`), prints the exact status and the
+provider's own error text for each, then reports **which endpoints actually
+exist** at whichever root worked.
 
-If one answers `200` it says so explicitly, with the root and auth style to
-copy into `API_ROOT` and `AUTH_STYLE` at the top of `api/ai.php`. If nothing
-answers, the key itself is the problem — check it is active and funded.
+Copy its findings into the three constants at the top of `api/ai.php`:
+
+| Constant | What it sets |
+|---|---|
+| `API_ROOT` | the provider's API root, no endpoint path |
+| `AUTH_STYLE` | `bearer` \| `x-api-key` \| `raw` \| `api-key` |
+| `API_SHAPE` | `responses` \| `chat` \| `auto` |
+
+### Two API shapes
+
+Providers implement one of two conventions, and the site speaks both:
+
+- **`responses`** — `POST /responses` with an `input` array and
+  `tools: [{type: "image_generation"}]`. This is what a **"Create response"**
+  endpoint in the docs means. The picture comes back as an
+  `image_generation_call` with base64 in `result`.
+- **`chat`** — `POST /chat/completions` with `messages` and
+  `modalities: ["image","text"]`, the OpenRouter convention. The picture comes
+  back on `message.images[]`.
+
+`API_SHAPE` defaults to `auto`: it tries `responses` first and falls back to
+`chat` only if that path is genuinely absent (404/405), so a wrong guess costs
+one wasted round trip rather than failing outright. Pin it once you know.
+
+**The right model depends on the shape.** Under `responses` the image comes
+from the tool, so `ai.model` should be a capable general model. Under `chat` it
+must be a model that outputs images. The self-test lists what your key can
+reach.
 
 ### Picking a model
 
