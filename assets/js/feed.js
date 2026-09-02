@@ -232,12 +232,19 @@
         pending = pending.concat(logs);
 
         // More log history makes the pool easier to identify with confidence.
-        if (!S.pool) S.pool = detectPool(pending);
+        if (!S.pool) {
+          S.pool = detectPool(pending);
+          // Say so the moment we know, rather than after the whole walk.
+          if (S.pool) meta('live · pool ' + RB.shortAddr(S.pool), true);
+        }
 
         if (S.pool) {
           ingest(pending, false);
           pending = [];
-          if (countBuys() >= SHOW) return;     // enough to fill the feed
+          // Full section, or enough to be useful without making the visitor
+          // wait on another dozen round trips.
+          if (countBuys() >= SHOW) return;
+          if (i >= 5 && countBuys() > 0) return;
         }
         return step(i + 1);
       }, function () {

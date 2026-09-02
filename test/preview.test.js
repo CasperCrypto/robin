@@ -57,4 +57,4 @@ setTimeout(() => {
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail?1:0);
-}, 1500);
+}, 3200);   // the feed now walks back through several windows
