@@ -46,7 +46,8 @@ setTimeout(() => {
   check('wallet auto-connected in demo', /0x/.test(t('#navConnect')), t('#navConnect'));
   check('swap shows balances', t('#balFrom')!=='—', t('#balFrom'));
   check('swap rate populated', t('#mRate').includes('ROBIN'), t('#mRate'));
-  check('tokenomics rendered', d.querySelectorAll('#tokList .tok-item').length===3);
+  check('supply facts rendered', d.querySelectorAll('#tokList .fact').length===4);
+  check('meme forge present', !!d.querySelector('#forgeStage'));
   check('no script errors', errors.length===0, errors.join(' | '));
 
   console.log(`\n${pass} passed, ${fail} failed`);

@@ -88,34 +88,44 @@ window.ROBIN = {
 
   /* ------------------------------------------------------------------- ai */
   ai: {
-    // Server-side proxy that holds your OpenRouter key. Relative on purpose so
-    // the site works from any sub-path (e.g. shopping.io/robin).
-    // PHP hosting -> 'api/ai.php'   |   Vercel/Netlify -> 'api/ai'
+    // Server-side proxy holding your API key. Relative so it works from the
+    // /robin sub-path. PHP hosting -> 'api/ai.php' | Vercel -> 'api/ai'
     endpoint: 'api/ai.php',
-    model:    'anthropic/claude-sonnet-4.5',
-    enabled:  true
+
+    // An image-output model on your provider. Must accept an input image and
+    // return one, so the generated doge stays your doge. See the README for a
+    // one-line curl that lists what your key can reach.
+    model: 'google/gemini-2.5-flash-image',
+
+    enabled: true
   },
 
   /* -------------------------------------------------------------- socials */
   links: {
-    twitter:   'https://x.com/robinnakamoto',   // <- set your real handle
-    telegram:  '',
+    twitter:   'https://x.com/shopping_io',
+    telegram:  'https://t.me/robinnakamotoofficial',
     dexscreener: 'https://dexscreener.com/robinhood/0x7d8a56584434d8355b891da0ff62d9168669f87dd9c8ad77f6c8fb0a6b6eb7d7',
     pons:      'https://www.ponsfamily.com/launchpad/0x280413fbF06CcC1114094A5967dB2191d49EE75e',
     uniswap:   'https://app.uniswap.org/swap',
     // Chain slug the Uniswap app uses in its ?chain= parameter.
     uniswapChainSlug: 'robinhood',
-    github:    'https://github.com/CasperCrypto/robin'
+    github:    ''
   },
 
   // X/Twitter handle for the live timeline embed (no @). Leave '' to hide it.
-  twitterHandle: 'robinnakamoto',
+  twitterHandle: 'shopping_io',
 
-  /* --------------------------------------------------------------- distro */
-  // Shown in the Tokenomics section. Percentages should total 100.
-  distribution: [
-    { label: 'Billy Markus (Shibetoshi)', pct: 30, note: 'Gifted to the Dogecoin co-creator', accent: true },
-    { label: 'Locked liquidity',          pct: 55, note: 'Permanently locked Uniswap V4 pool' },
-    { label: 'Community & treasury',      pct: 15, note: 'Listings, marketing, partnerships' }
+  /* --------------------------------------------------------------- supply */
+  // Verifiable facts, not a made-up percentage split. Each is something a
+  // holder can check on the explorer or in the contract.
+  supplyFacts: [
+    { label: 'Fixed supply',   value: '1,000,000,000',
+      note: 'Minted once by the Pons factory. No mint function, ever.' },
+    { label: 'Sent to Billy Markus', value: '30,000,000',
+      note: '3% of supply, gifted to the co-creator of Dogecoin.', accent: true },
+    { label: 'Liquidity',      value: 'Locked forever',
+      note: 'A permanently locked Uniswap V4 position. Nobody can pull it.' },
+    { label: 'Swap fee',       value: '4%',
+      note: '3% to the creator, 1% to the Pons protocol. Taken by the pool hook.' }
   ]
 };

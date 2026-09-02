@@ -1,29 +1,20 @@
 /**
- * ai.js — the same OpenRouter proxy as ai.php, for Node hosts.
+ * ai.js — the same image proxy as ai.php, for Node hosts (Vercel, Netlify).
  *
- * Works as-is on Vercel (`/api/ai`) and Netlify (with a redirect to functions).
- * Set OPENROUTER_API_KEY in the host's environment variables — never in code.
- *
- * If you are deploying to plain PHP hosting, use api/ai.php instead and you can
- * delete this file. Point ROBIN.ai.endpoint in assets/js/config.js at whichever
- * one you keep ('api/ai.php' or 'api/ai').
+ * Set ROBIN_AI_KEY in the host's environment variables — never in code.
+ * On plain PHP hosting use api/ai.php instead and delete this file. Point
+ * ROBIN.ai.endpoint in assets/js/config.js at whichever one you keep.
  */
 
-const MODEL_DEFAULT = 'anthropic/claude-sonnet-4.5';
-const MAX_INPUT = 1200;
-const MAX_TURNS = 12;
-const RATE_MAX = 25;
-const RATE_WINDOW = 300_000;
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
-const TOKEN_NAME = 'Robin Nakamoto ($ROBIN)';
-const TOKEN_ADDR = '0x280413fbF06CcC1114094A5967dB2191d49EE75e';
-const CHAIN_ID = 4663;
-const CHAIN_RPC = 'https://rpc.mainnet.chain.robinhood.com';
-const DS_CHAIN = 'robinhood';
-const DS_POOL = '0x7d8a56584434d8355b891da0ff62d9168669f87dd9c8ad77f6c8fb0a6b6eb7d7';
+const API_BASE = 'https://api.concentrate.ai/api/v1/chat/completions';
+const MODEL = 'google/gemini-2.5-flash-image';
+const MAX_PROMPT = 400;
+const RATE_MAX = 8;
+const RATE_WINDOW = 600_000;
 
-// Best-effort in-memory limiter. Serverless instances are recycled, so treat
-// this as friction against casual abuse, not a hard guarantee.
 const hits = new Map();
 function rateLimited(ip) {
   const now = Date.now();
@@ -35,81 +26,49 @@ function rateLimited(ip) {
   return false;
 }
 
-const clean = (s) => String(s ?? '').trim().slice(0, MAX_INPUT);
-
-let mktCache = { at: 0, data: null };
-async function marketContext() {
-  if (Date.now() - mktCache.at < 30_000 && mktCache.data) return mktCache.data;
-  let out = 'Live market data is unavailable right now.';
+let refCache;
+async function referenceImage() {
+  if (refCache !== undefined) return refCache;
   try {
-    const r = await fetch(`https://api.dexscreener.com/latest/dex/pairs/${DS_CHAIN}/${DS_POOL}`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(8000),
-    });
-    const j = await r.json();
-    const p = j.pairs?.[0] || j.pair;
-    if (p) {
-      out = [
-        'LIVE MARKET DATA (updated seconds ago):',
-        `- Price: $${p.priceUsd ?? 'unknown'}`,
-        `- 24h change: ${p.priceChange?.h24 ?? 'unknown'}%`,
-        `- Market cap: $${p.marketCap ?? p.fdv ?? 'unknown'}`,
-        `- 24h volume: $${p.volume?.h24 ?? 'unknown'}`,
-        `- Liquidity: $${p.liquidity?.usd ?? 'unknown'}`,
-        `- 24h buys/sells: ${p.txns?.h24?.buys ?? '?'} / ${p.txns?.h24?.sells ?? '?'}`,
-      ].join('\n');
-    }
-  } catch { /* keep the fallback line */ }
-  mktCache = { at: Date.now(), data: out };
-  return out;
+    const p = path.join(process.cwd(), 'assets', 'img', 'robin-logo.png');
+    refCache = 'data:image/png;base64,' + (await readFile(p)).toString('base64');
+  } catch {
+    refCache = null;
+  }
+  return refCache;
 }
 
-async function systemPrompt(mode) {
-  const facts =
-`You are Robin — the assistant on the official ${TOKEN_NAME} website.
+const styleFor = (prompt) =>
+`You are illustrating official artwork for the $ROBIN (Robin Nakamoto) memecoin.
 
-FACTS YOU KNOW:
-- ${TOKEN_NAME} is a memecoin native to Robinhood Chain (EVM chain ID ${CHAIN_ID}, gas paid in ETH).
-- Contract address: ${TOKEN_ADDR}. This is the only correct address.
-- RPC: ${CHAIN_RPC}
-- It launched on the Pons launchpad, graduated off the bonding curve, and now trades in a
-  permanently locked Uniswap V4 pool governed by the Pons shared hook.
-- Fixed supply of 1,000,000,000. No mint function, no team unlocks.
-- 30% of supply was gifted to Billy Markus (Shibetoshi Nakamoto), co-creator of Dogecoin.
-- The site is built by the Shopping.io team.
-- To buy: bridge ETH to Robinhood Chain, connect a wallet, swap on this page or any
-  Uniswap front-end on chain ${CHAIN_ID}.
+The attached image is the canonical character: a Shiba Inu wearing a bright green
+Robin Hood hat with a white feather and thick black rectangular glasses.
 
-${await marketContext()}
+Draw a NEW square image of this exact character in the scene the user describes.
+Rules:
+- Keep the character on-model: same shiba, same green feathered hat, same black glasses.
+- Match the source style: bold clean outlines, flat cel shading, saturated colours,
+  cartoon/vector look. No photorealism, no 3D render.
+- Use the brand lime green (#A8DC2B) somewhere prominent, usually the background.
+- Keep it readable as a small square thumbnail on social media.
+- No text or lettering in the image unless the user explicitly asks for words.
+- Nothing hateful, sexual, or depicting real people.
 
-RULES:
-- Never give financial advice, price predictions or targets. If asked whether to buy or where
-  price is going, say plainly that you won't predict prices, and explain what the data shows.
-- Be honest when the numbers look weak. Never hype past what the data supports.
-- Remind people this is a memecoin that can go to zero when the topic is risk or buying.
-- Never ask for seed phrases, private keys or wallet approvals. You cannot transact.
-- If you don't know something, say so.
-`;
+SCENE: ${prompt}`;
 
-  if (mode === 'alpha') {
-    return facts + `
-TASK: Write a short market report on $ROBIN from the live data above.
-Cover: what the price action and volume actually show, how liquidity looks relative to market
-cap, and the buy/sell balance. 130-180 words. Confident and readable, not hype. Say clearly if
-the data shows a quiet or weak market. End with one line reminding the reader this is not
-financial advice. Use short paragraphs, no headings.`;
+/** Providers differ slightly; accept the common response shapes. */
+function extractImage(j) {
+  const msg = j?.choices?.[0]?.message ?? {};
+  if (msg.images?.[0]?.image_url?.url) return msg.images[0].image_url.url;
+  if (msg.images?.[0]?.url) return msg.images[0].url;
+  if (Array.isArray(msg.content)) {
+    for (const part of msg.content) {
+      if (part?.image_url?.url) return part.image_url.url;
+      if (part?.type === 'output_image' && part.data) return 'data:image/png;base64,' + part.data;
+    }
   }
-  if (mode === 'meme') {
-    return facts + `
-TASK: Write exactly 3 posts for X promoting $ROBIN, based on the angle the user gives. Each
-under 240 characters, each a different flavour (funny, punchy, community). Use $ROBIN and at
-most 2 hashtags. No price predictions, no "guaranteed" or "to the moon" financial claims.
-Separate the three posts with a line containing only ---
-Output nothing but the posts and the separators.`;
-  }
-  return facts + `
-TASK: Answer the user's question about $ROBIN, Robinhood Chain, or how to trade it. Be brief and
-concrete — usually under 110 words. Plain language. You may use **bold** and simple bullet lists.`;
+  if (j?.data?.[0]?.b64_json) return 'data:image/png;base64,' + j.data[0].b64_json;
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -125,15 +84,14 @@ export default async function handler(req, res) {
 
   const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
              req.socket?.remoteAddress || '0.0.0.0';
-  if (rateLimited(ip)) return json(429, { error: 'Slow down a moment — too many requests.' });
+  if (rateLimited(ip)) return json(429, { error: 'That is a lot of memes. Give it a couple of minutes.' });
 
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return json(503, { error: 'Robin AI is not configured yet — set OPENROUTER_API_KEY.' });
+  const key = process.env.ROBIN_AI_KEY || process.env.OPENROUTER_API_KEY;
+  if (!key) return json(503, { error: 'The meme forge is not configured yet — set ROBIN_AI_KEY.' });
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = null; } }
   if (!body || typeof body !== 'object') {
-    // Some runtimes don't pre-parse; read the stream ourselves.
     try {
       const chunks = [];
       for await (const c of req) chunks.push(c);
@@ -141,56 +99,57 @@ export default async function handler(req, res) {
     } catch { return json(400, { error: 'Bad request body' }); }
   }
 
-  const mode = String(body.mode || 'chat');
-  if (!['chat', 'alpha', 'meme'].includes(mode)) return json(400, { error: 'Unknown mode' });
+  const prompt = String(body.prompt ?? '').trim().slice(0, MAX_PROMPT);
+  if (!prompt) return json(400, { error: 'Tell it what to draw first.' });
 
-  let messages = [];
-  if (mode === 'chat') {
-    messages = (Array.isArray(body.messages) ? body.messages : [])
-      .slice(-MAX_TURNS)
-      .map((m) => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: clean(m.content),
-      }))
-      .filter((m) => m.content);
-    if (!messages.length) return json(400, { error: 'Nothing to answer' });
-  } else {
-    messages = [{ role: 'user', content: clean(body.prompt) || 'Go.' }];
-  }
+  const content = [{ type: 'text', text: styleFor(prompt) }];
+  const ref = await referenceImage();
+  if (ref) content.push({ type: 'image_url', image_url: { url: ref } });
 
   try {
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const r = await fetch(API_BASE, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${key}`,
         'HTTP-Referer': `https://${req.headers.host || 'shopping.io'}`,
-        'X-Title': 'ROBIN Nakamoto',
+        'X-Title': 'ROBIN Meme Forge',
       },
       body: JSON.stringify({
-        model: String(body.model || '') || MODEL_DEFAULT,
-        messages: [{ role: 'system', content: await systemPrompt(mode) }, ...messages],
-        max_tokens: mode === 'chat' ? 500 : 700,
-        temperature: mode === 'meme' ? 0.95 : 0.6,
+        model: String(body.model || '') || MODEL,
+        modalities: ['image', 'text'],
+        messages: [{ role: 'user', content }],
       }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(120_000),
     });
 
     const j = await r.json();
     if (!r.ok) {
-      console.error('[robin-ai] OpenRouter', r.status, j?.error?.message);
+      console.error('[robin-forge]', r.status, j?.error?.message);
+      if (r.status === 401 || r.status === 403) {
+        return json(502, { error: 'The API key was rejected — check ROBIN_AI_KEY.' });
+      }
+      if (r.status === 429) {
+        return json(429, { error: 'The image service is rate-limiting us. Try again shortly.' });
+      }
+      return json(502, { error: 'The image service is busy. Try again in a moment.' });
+    }
+
+    const image = extractImage(j);
+    if (!image) {
+      const said = typeof j?.choices?.[0]?.message?.content === 'string'
+        ? j.choices[0].message.content.trim() : '';
+      console.error('[robin-forge] no image; text was:', said.slice(0, 300));
       return json(502, {
-        error: r.status === 401
-          ? 'Robin AI key was rejected — check OPENROUTER_API_KEY.'
-          : 'Robin AI is busy right now. Try again in a moment.',
+        error: said
+          ? 'That model replied with text instead of an image. Point ai.model at an image model.'
+          : 'No image came back. Try a different scene.',
       });
     }
 
-    const text = j.choices?.[0]?.message?.content || '';
-    if (!text) return json(502, { error: 'Empty response from the model' });
-    return json(200, { text, model: j.model || MODEL_DEFAULT });
+    return json(200, { image, model: j.model || MODEL });
   } catch (e) {
-    console.error('[robin-ai]', e?.message);
-    return json(502, { error: 'Robin AI could not be reached. Try again in a moment.' });
+    console.error('[robin-forge]', e?.message);
+    return json(502, { error: 'The image service could not be reached. Try again in a moment.' });
   }
 }

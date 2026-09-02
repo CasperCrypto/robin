@@ -66,11 +66,12 @@ Everything you'd want to change is in **`assets/js/config.js`** — one commente
 The things worth setting before launch:
 
 ```js
-links.twitter    // your real X URL — the footer link and the timeline embed
-links.telegram   // leave '' and the link is removed rather than left dead
+links.*          // X, Telegram, DexScreener, Pons. Leave '' and the link is
+                 // removed rather than left dead (github is empty by default)
 twitterHandle    // handle only, no @, for the live timeline
-distribution     // the tokenomics rows and their percentages
+supplyFacts      // the tokenomics tiles
 swap.feePct      // total fee the Pons hook takes per swap (see below)
+ai.model         // the image model the meme forge calls
 ```
 
 ### `swap.feePct` — read this if you changed your creator fee
@@ -116,36 +117,61 @@ rather pin it, set `market.poolContract` in the config.
 doesn't have it, reads real balances, quotes from the live pool and shows minimum
 received at your slippage. See below for the two execution modes.
 
-**Robin AI** — three tools sharing one endpoint: a chat assistant, an "alpha report"
-that reads the live numbers and writes an honest take, and a meme forge that drafts
-three X posts from an angle you give it.
+**Meme forge** — the one AI feature. Describe a scene, get a picture of Robin in
+it, drawn from your real artwork so the character stays on-model. Download, copy,
+or post straight to X.
 
 ---
 
-## Robin AI setup (OpenRouter)
+## The meme forge (AI image generation)
 
-Your API key **must not** go in the browser. `api/ai.php` (or `api/ai.js`) is a thin
-proxy that holds it server-side and adds the system prompt and live market context.
+One AI feature: a visitor describes a scene, and the site returns a picture of
+Robin in it. The prompt is wrapped server-side with a house style, and **your
+`robin-logo.png` is attached as a reference image on every call**, so the
+generated dog is always your dog — same hat, same glasses, same art style.
+
+Visitors can download the result, copy it to the clipboard, or open X with the
+caption pre-filled.
+
+### Setup
+
+Your API key must never reach the browser. `api/ai.php` holds it server-side.
 
 **PHP hosting** — the common case:
 
 1. Keep `api/ai.php`, delete `api/ai.js`.
-2. Set the key, either as an environment variable `OPENROUTER_API_KEY`, or by renaming
-   `api/config.example.php` to `api/config.php` and pasting the key in.
-3. `config.php` is git-ignored. Never commit it.
+2. Set the key either as an environment variable `ROBIN_AI_KEY`, or by renaming
+   `api/config.example.php` to `api/config.php` and pasting it in.
+3. `api/config.php` is git-ignored. Never commit it.
 
-**Vercel / Netlify:** keep `api/ai.js`, delete `api/ai.php`, set `OPENROUTER_API_KEY` in
-the host's environment variables, and change `ai.endpoint` in `config.js` to `'api/ai'`.
+**Vercel / Netlify:** keep `api/ai.js`, delete `api/ai.php`, set `ROBIN_AI_KEY`
+in the host's environment variables, and change `ai.endpoint` in `config.js`
+to `'api/ai'`.
 
-Both proxies rate-limit to 25 requests per 5 minutes per IP, cap input length, cache the
-market lookup for 30s, and never echo the key or the raw upstream error.
+### Picking a model
 
-Model is `anthropic/claude-sonnet-4.5` by default — change `ai.model` in `config.js` for
-anything else OpenRouter serves.
+`ai.model` in `config.js` must name a model that **accepts an input image and
+returns an image**. The default is `google/gemini-2.5-flash-image`.
 
-If the key isn't set the AI section says so plainly; the rest of the site is unaffected.
+To see what your key can actually reach:
 
----
+```bash
+curl -s https://api.concentrate.ai/api/v1/models \
+  -H "Authorization: Bearer $ROBIN_AI_KEY" | grep -i image
+```
+
+If you point it at a text-only model the site says so plainly rather than
+failing silently — the error names the problem.
+
+The endpoint base is `API_BASE` at the top of `api/ai.php` (and `api/ai.js`).
+Change it there if your provider uses a different URL.
+
+### Cost control
+
+Image calls are the expensive kind, so the proxy limits each IP to **8 images
+per 10 minutes**, caps the prompt at 400 characters, and only counts an attempt
+once it is actually about to call out. Raise or lower `RATE_MAX` and
+`RATE_WINDOW` in the proxy to taste.
 
 ## Enabling on-page swaps
 

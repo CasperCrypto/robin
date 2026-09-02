@@ -36,11 +36,9 @@
     return out;
   }
 
-  var AI = {
-    chat: "**Short version:** bridge a little ETH to Robinhood Chain, connect your wallet, and swap on this page.\\n\\n- Gas on chain 4663 is paid in **ETH**, so keep a few dollars of it spare\\n- Always check the contract reads `0x2804...E75e` before confirming\\n- Liquidity sits in a locked Uniswap V4 pool, so the pair won't vanish under you\\n\\nIt's still a memecoin — only put in what you'd shrug off losing.",
-    alpha: "$ROBIN is trading around $0.00042 with a market cap near $421K, up roughly 18% on the day.\\n\\nThe more interesting number is liquidity: about $96K against that market cap, which is a ratio of roughly 1:4.4. That's unusually deep for a token this size and it means moderate size can move in and out without wrecking the chart.\\n\\nFlow is skewed to the bid — 214 buys against 97 sells over 24 hours, on $128K of volume. Volume running at ~30% of market cap says this is being actively traded rather than sitting still.\\n\\nWhat it doesn't tell you is whether any of that persists. Two-to-one buy pressure on a day-old memecoin is a mood, not a trend.\\n\\nNone of this is financial advice.",
-    meme: "They gave 30% of the supply to the man who created Dogecoin.\\n\\nNot a partnership. Not an ad deal. Just sent it.\\n\\n$ROBIN\\n---\\nrobin hood stole from the rich and gave to the poor\\n\\n$ROBIN sent 30% of supply to Billy Markus and locked the rest of the liquidity forever\\n\\nsame energy, better chain 🏹\\n---\\nfixed supply. locked LP. no team unlocks. 30% with Dogecoin's co-creator.\\n\\nthe boring stuff is done properly so the fun stuff can be fun.\\n\\n$ROBIN on Robinhood Chain #ROBIN"
-  };
+  // The forge returns a picture now. The preview can't call the image service,
+  // so it answers with a pre-rendered sample of the same shape.
+  var SAMPLE = 'assets/img/forge-sample.webp';
 
   var real = window.fetch ? window.fetch.bind(window) : null;
   window.fetch = function (url, opts) {
@@ -65,14 +63,13 @@
       return J({ result: '0x0' }, 60);
     }
     if (u.indexOf('api/ai') > -1) {
-      var mode = 'chat'; try { mode = JSON.parse(opts.body).mode || 'chat'; } catch (e) {}
-      return J({ text: AI[mode] || AI.chat }, 1100);
+      return J({ image: SAMPLE, model: 'preview-sample' }, 2600);
     }
     return real ? real(url, opts) : Promise.reject(new Error('blocked'));
   };
 
   // No injected wallet in the sandbox: make the swap panel demonstrable.
-  var acct = '0x017332784f7a5c577996168E683611949570E907';
+  var acct = '0xD8dA6BF26964aF9D7eEd9e03E53415D37aA96045';   // a well-known public address, preview only
   window.ethereum = {
     isMetaMask: true,
     request: function (r) {

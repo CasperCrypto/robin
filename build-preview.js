@@ -21,7 +21,7 @@ const dataUri = (p) => {
 html = html.replaceAll('assets/img/robin-doge.gif', 'assets/img/robin-doge.webp');
 const IMG = [
   'robin-logo.png','robin-logo.webp','robin-logo-128.png','robin-logo-128.webp',
-  'robin-doge.webp','robin-doge-poster.webp',
+  'robin-doge.webp','robin-doge-poster.webp','forge-sample.webp',
   'favicon-32.png','favicon-48.png','favicon.ico','apple-touch-icon.png',
 ];
 const LOGO = dataUri('assets/img/robin-logo.png');

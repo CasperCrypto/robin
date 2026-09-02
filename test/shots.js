@@ -66,6 +66,23 @@ const VIEWS = [
     await page.evaluate(() => document.querySelector('#meme').scrollIntoView());
     await page.waitForTimeout(1400);
     await page.screenshot({ path: path.join(OUT, v.name + '-meme.png') });
+
+    // exercise the meme forge end to end
+    await page.evaluate(() => document.querySelector('#ai').scrollIntoView());
+    await page.fill('#forgePrompt', 'surfing a giant green candle');
+    await page.click('#forgeBtn');
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(OUT, v.name + '-forge-loading.png') });
+    await page.waitForSelector('#forgeImg:not([hidden])', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(700);
+    await page.screenshot({ path: path.join(OUT, v.name + '-forge.png') });
+    const forge = await page.evaluate(() => ({
+      state: document.querySelector('#forgeStage')?.dataset.state,
+      shown: !document.querySelector('#forgeImg')?.hidden,
+      acts:  !document.querySelector('#forgeActions')?.hasAttribute('hidden'),
+      dl:    document.querySelector('#forgeDownload')?.getAttribute('download'),
+    }));
+    console.log(`   forge: state=${forge.state} image=${forge.shown} actions=${forge.acts} file=${forge.dl}`);
     await ctx.close();
   }
   await browser.close();

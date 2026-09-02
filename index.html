@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://shopping.io/robin/assets/img/robin-banner.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="$ROBIN — Robin Nakamoto">
-<meta name="twitter:description" content="The memecoin of Robinhood Chain. 30% gifted to Billy Markus.">
+<meta name="twitter:description" content="The memecoin of Robinhood Chain. 30M tokens gifted to Billy Markus.">
 <meta name="twitter:image" content="https://shopping.io/robin/assets/img/robin-banner.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -44,7 +44,7 @@
       <a href="#swap">Swap</a>
       <a href="#feed">Live buys</a>
       <a href="#tokenomics">Tokenomics</a>
-      <a href="#ai">Robin AI</a>
+      <a href="#ai">Meme forge</a>
       <a href="#community">Community</a>
       <a href="#faq">FAQ</a>
     </nav>
@@ -85,7 +85,7 @@
 
         <p class="lede enter enter-4">
           The memecoin native to <b>Robinhood Chain</b>, with
-          <b>30% of supply gifted to Billy Markus</b> — the man who made Dogecoin.<span class="lede-more">
+          <b>30M tokens gifted to Billy Markus</b> — the man who made Dogecoin.<span class="lede-more">
           Launched through the Pons bonding curve and graduated into a permanently
           locked Uniswap&nbsp;V4 pool.</span>
         </p>
@@ -267,8 +267,8 @@
 
       <div class="billy lg lg-d rv">
         <div class="ring">🐕</div>
-        <h3>30% went to Billy Markus</h3>
-        <p>We sent nearly a third of the entire supply to <b>Shibetoshi Nakamoto</b> —
+        <h3>30 million to Billy Markus</h3>
+        <p>We sent 30,000,000 $ROBIN — 3% of the entire supply — to <b>Shibetoshi Nakamoto</b> —
            the developer who co-created Dogecoin and started all of this. No strings,
            no vesting cliff, no deal. Just the biggest tip in Robinhood Chain history.</p>
         <div class="quote">"Robin Nakamoto: the dog that gives it back."</div>
@@ -319,48 +319,52 @@
 <section class="sec dark" id="ai" style="padding-top:0">
   <div class="wrap">
     <div class="sec-head center rv">
-      <span class="eyebrow">✨ Powered by OpenRouter</span>
-      <h2 class="sec-title">Robin AI</h2>
-      <p class="sec-sub">An assistant that reads the live chart before it opens its mouth.
-        Ask it anything, get an honest read on the market, or let it write your next post.</p>
+      <span class="eyebrow">Robin's meme machine</span>
+      <h2 class="sec-title">Put Robin in it.</h2>
+      <p class="sec-sub">Describe any scene and the AI paints Robin into it — same dog, same
+        feathered hat, same glasses — because it draws from the real artwork every time.
+        Download it, post it, watch it spread.</p>
     </div>
 
-    <div class="ai-tabs rv" role="tablist">
-      <button class="ai-tab on" data-pane="chat"  role="tab" aria-selected="true">Ask Nakamoto</button>
-      <button class="ai-tab"    data-pane="alpha" role="tab" aria-selected="false">Alpha report</button>
-      <button class="ai-tab"    data-pane="meme"  role="tab" aria-selected="false">Meme forge</button>
-    </div>
-
-    <div class="ai-panel lg lg-d rv">
-      <!-- chat -->
-      <div class="ai-pane on" data-pane="chat">
-        <div class="ai-log" id="aiLog"></div>
-        <div class="ai-chips" id="aiChips"></div>
-        <form class="ai-form" id="aiForm">
-          <input id="aiInput" type="text" placeholder="How do I get ETH onto Robinhood Chain?" autocomplete="off" aria-label="Ask Robin AI">
-          <button class="btn btn-lime" type="submit">Send</button>
-        </form>
+    <div class="forge lg lg-d rv">
+      <div class="forge-stage" id="forgeStage" data-state="idle">
+        <img class="forge-img" id="forgeImg" alt="" hidden>
+        <div class="forge-idle" id="forgeIdle">
+          <picture>
+            <source srcset="assets/img/robin-logo.webp" type="image/webp">
+            <img src="assets/img/robin-logo.png" width="128" height="128" alt="" loading="lazy" decoding="async">
+          </picture>
+          <p>Your meme lands here.</p>
+        </div>
+        <div class="forge-load" id="forgeLoad" hidden>
+          <div class="forge-orb"><span></span><span></span><span></span></div>
+          <p id="forgeStatus">Sharpening the crayons…</p>
+        </div>
       </div>
 
-      <!-- alpha -->
-      <div class="ai-pane" data-pane="alpha">
-        <p style="margin:0 0 16px;font-size:14.5px;opacity:.66">
-          Robin pulls the live price, volume, liquidity and 24h move, then tells you what it
-          actually thinks — including when it thinks nothing is happening.</p>
-        <div class="ai-out" id="alphaOut"><div class="ph">Hit the button for a fresh read.</div></div>
-        <button class="btn btn-lime btn-block" id="alphaBtn" type="button" style="margin-top:16px">Generate alpha report</button>
-      </div>
-
-      <!-- meme -->
-      <div class="ai-pane" data-pane="meme">
-        <p style="margin:0 0 14px;font-size:14.5px;opacity:.66">
-          Give it an angle and it writes three posts you can ship straight to X.</p>
-        <div class="ai-chips" id="memeChips"></div>
-        <form class="ai-form" id="memeForm" style="margin-bottom:16px">
-          <input id="memeInput" type="text" placeholder="e.g. Billy Markus just got 30% of the supply" autocomplete="off" aria-label="Meme angle">
-          <button class="btn btn-lime" type="submit">Forge</button>
+      <div class="forge-side">
+        <label class="forge-label" for="forgePrompt">What should Robin be doing?</label>
+        <div class="ai-chips" id="forgeChips"></div>
+        <form class="forge-form" id="forgeForm">
+          <textarea id="forgePrompt" rows="3" maxlength="400"
+                    placeholder="riding a rocket over Wall Street, holding a green flag"
+                    aria-label="Describe the scene"></textarea>
+          <button class="btn btn-lime btn-block" id="forgeBtn" type="submit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5z"/></svg>
+            Generate
+          </button>
         </form>
-        <div class="ai-out" id="memeOut"><div class="ph">Your posts will appear here.</div></div>
+
+        <div class="forge-actions" id="forgeActions" hidden>
+          <a class="btn btn-glass on-dark" id="forgeDownload" download="robin-meme.png">Download</a>
+          <button class="btn btn-glass on-dark" id="forgeCopy" type="button">Copy image</button>
+          <a class="btn btn-glass on-dark" id="forgeShare" target="_blank" rel="noopener">Post on X</a>
+        </div>
+
+        <p class="forge-note" id="forgeNote">
+          Free to use, a few seconds each. Images are made by an AI and belong to whoever
+          posts them — go wild, keep it legal.
+        </p>
       </div>
     </div>
   </div>
@@ -400,7 +404,7 @@
                community close, let the chart follow the work.</p></div></div>
         <div class="step lg lg-d"><div class="n-ico" aria-hidden="true">🤝</div>
           <div><h4>Blessed by the source</h4>
-            <p>30% of supply lives with Dogecoin's co-creator. That's not a partnership
+            <p>30,000,000 $ROBIN lives with Dogecoin's co-creator. That's not a partnership
                announcement — that's an on-chain transfer you can verify.</p></div></div>
       </div>
     </div>
@@ -427,7 +431,7 @@
         <div class="a">Yes. $ROBIN graduated off the Pons bonding curve into a Uniswap V4 pool whose
           position is permanently locked and governed by the Pons shared hook. The LP cannot be
           withdrawn by the team or anyone else.</div></details>
-      <details class="q"><summary>Did Billy Markus really get 30%?</summary>
+      <details class="q"><summary>Did Billy Markus really get 30M tokens?</summary>
         <div class="a">He did — sent from us, unprompted, with nothing asked in return. It's a plain
           ERC-20 transfer, so you don't have to take our word for it:
           <a href="#" id="faqScan" target="_blank" rel="noopener">check the explorer</a>.</div></details>

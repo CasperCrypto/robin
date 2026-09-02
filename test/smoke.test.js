@@ -84,15 +84,19 @@ setTimeout(() => {
   check('volume populated', t('#sVol') === '$128.4K', t('#sVol'));
   check('liquidity populated', t('#sLiq') === '$96.2K', t('#sLiq'));
   check('marquee filled', d.querySelectorAll('#marquee span').length === 20);
-  check('tokenomics rows rendered', d.querySelectorAll('#tokList .tok-item').length === 3);
-  check('tokenomics bars total 100%',
-    win.ROBIN.distribution.reduce((a, x) => a + x.pct, 0) === 100);
+  check('supply facts rendered', d.querySelectorAll('#tokList .fact').length === 4);
+  check('Billy figure is 30M, not 30%',
+    /30,000,000/.test(d.querySelector('#tokList').textContent) &&
+    !/30%/.test(d.querySelector('#tokList').textContent));
   check('slippage buttons rendered', d.querySelectorAll('#slip button').length === 4);
   check('preset buttons rendered', d.querySelectorAll('#presets button').length === 4);
   check('swap CTA reflects no wallet', /wallet/i.test(t('#swapBtn')), t('#swapBtn'));
-  check('AI greeting rendered', d.querySelectorAll('#aiLog .msg').length >= 1);
-  check('AI suggestion chips rendered', d.querySelectorAll('#aiChips button').length === 5);
-  check('meme chips rendered', d.querySelectorAll('#memeChips button').length === 4);
+  check('meme forge present', !!d.querySelector('#forgeStage'));
+  check('forge starts idle', d.querySelector('#forgeStage')?.dataset.state === 'idle');
+  check('forge presets rendered', d.querySelectorAll('#forgeChips button').length === 6);
+  check('forge actions hidden until a result', d.querySelector('#forgeActions')?.hasAttribute('hidden'));
+  check('only one AI feature ships',
+    !d.querySelector('#aiLog') && !d.querySelector('#alphaOut') && !d.querySelector('#memeOut'));
   check('FAQ items present', d.querySelectorAll('.faq details').length === 7);
   // The contract that matters: nothing is left parked invisible. An element is
   // either never armed, or armed and revealed — never armed and stuck.
@@ -111,7 +115,15 @@ setTimeout(() => {
     d.querySelector('#dogeAnim img')?.getAttribute('src'));
   check('no generated SVG art referenced',
     !fs.readFileSync(path.join(root,'index.html'),'utf8').includes('robin-logo.svg'));
-  check('unconfigured telegram link removed', d.querySelector('#fTg') === null);
+  check('telegram link wired', d.querySelector('#fTg')?.href === 'https://t.me/robinnakamotoofficial',
+    d.querySelector('#fTg')?.href);
+  check('x link points at shopping_io', d.querySelector('#fTw')?.href === 'https://x.com/shopping_io',
+    d.querySelector('#fTw')?.href);
+  check('unconfigured github link removed', d.querySelector('#fGh') === null);
+  check('no "30%" claim anywhere in the page',
+    !/30%/.test(fs.readFileSync(path.join(root,'index.html'),'utf8')));
+  check('contract address unchanged',
+    win.ROBIN.token.address === '0x280413fbF06CcC1114094A5967dB2191d49EE75e');
   check('no dead "#" hrefs left',
     [...d.querySelectorAll('a[href="#"]')].length === 0,
     [...d.querySelectorAll('a[href="#"]')].map(a => a.id).join(','));

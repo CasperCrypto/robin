@@ -806,3 +806,74 @@ body.has-buybar .foot{padding-bottom:calc(26px + 70px + env(safe-area-inset-bott
   .hero-copy{align-items:flex-start}
   .wordmark{font-size:58px}
 }
+
+/* ═══════════════════════════════════════════════════════════ supply facts */
+.tok-list{display:grid;gap:11px}
+.fact{padding:18px;border-radius:var(--r-lg)}
+.fact.accent{border-color:rgba(168,220,43,.45);background:rgba(168,220,43,.09)}
+.fact-k{font-size:10.5px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--text-inv-mute)}
+.fact.accent .fact-k{color:var(--lime-400)}
+.fact-v{
+  font-family:var(--font-display);font-weight:800;font-size:clamp(24px,6.6vw,32px);
+  letter-spacing:-.035em;margin-top:4px;line-height:1.05;font-variant-numeric:tabular-nums;
+}
+.fact.accent .fact-v{color:var(--lime-300)}
+.fact p{margin:7px 0 0;font-size:13px;line-height:1.55;color:var(--text-inv-soft)}
+
+/* ═══════════════════════════════════════════════════════════ the meme forge */
+.forge{display:grid;gap:18px;padding:16px;border-radius:var(--r-2xl)}
+
+.forge-stage{
+  position:relative;aspect-ratio:1;border-radius:var(--r-xl);overflow:hidden;
+  display:grid;place-items:center;
+  background:
+    radial-gradient(circle at 50% 42%,rgba(168,220,43,.16),transparent 62%),
+    var(--ink-2);
+  border:1px solid var(--gd-rim);
+}
+.forge-stage[data-state="done"]{background:var(--ink)}
+.forge-img{width:100%;height:100%;object-fit:cover;animation:pop .5s var(--ease-out)}
+
+.forge-idle{text-align:center;padding:24px;color:var(--text-inv-mute)}
+.forge-idle img{width:88px;height:88px;border-radius:22px;margin:0 auto 14px;opacity:.5;filter:grayscale(.35)}
+.forge-idle p{margin:0;font-size:14px;font-weight:600}
+
+.forge-load{text-align:center;padding:24px}
+.forge-load p{margin:16px 0 0;font-size:13.5px;color:var(--text-inv-soft);font-weight:600}
+.forge-orb{display:flex;gap:9px;justify-content:center}
+.forge-orb span{
+  width:13px;height:13px;border-radius:50%;
+  background:linear-gradient(160deg,var(--lime-300),var(--lime-600));
+  animation:orb 1.25s var(--ease) infinite;
+  box-shadow:0 0 18px rgba(168,220,43,.55);
+}
+.forge-orb span:nth-child(2){animation-delay:.16s}
+.forge-orb span:nth-child(3){animation-delay:.32s}
+@keyframes orb{0%,70%,100%{transform:translateY(0) scale(.86);opacity:.5}35%{transform:translateY(-13px) scale(1);opacity:1}}
+
+.forge-side{display:flex;flex-direction:column}
+.forge-label{font-size:12.5px;font-weight:700;color:var(--text-inv-soft);margin-bottom:10px}
+.forge-form{display:flex;flex-direction:column;gap:10px}
+.forge-form textarea{
+  width:100%;resize:vertical;min-height:82px;padding:13px 15px;border-radius:var(--r-md);
+  background:var(--gd-fill);border:1px solid var(--gd-rim);color:var(--text-inv);
+  font-family:var(--font);font-size:16px;line-height:1.5;outline:none;
+}
+.forge-form textarea:focus{border-color:rgba(168,220,43,.55);background:var(--gd-fill-hi)}
+.forge-form textarea::placeholder{color:rgba(244,255,227,.30)}
+
+.forge-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.forge-actions .btn{flex:1 1 calc(50% - 4px);padding:12px 14px;font-size:13.5px}
+.forge-actions[hidden]{display:none}
+
+.forge-note{margin:12px 0 0;font-size:12px;line-height:1.55;color:var(--text-inv-mute)}
+.forge-note.err{color:#ffc9c9}
+
+@media (min-width:700px){
+  .forge{grid-template-columns:1fr 1fr;gap:26px;padding:24px;align-items:start}
+  .forge-side{padding-top:4px}
+  .forge-actions .btn{flex:1 1 auto}
+}
+@media (min-width:940px){
+  .forge{grid-template-columns:440px 1fr;gap:32px}
+}

@@ -11,8 +11,8 @@ cp -r index.html assets api README.md dist/
 cat > dist/api/config.example.php <<'PHP'
 <?php
 /* Rename to config.php and paste your key. config.php is git-ignored.
-   Prefer a real environment variable if your host supports one. */
-return ['OPENROUTER_API_KEY' => 'sk-or-v1-...'];
+   Prefer a real environment variable (ROBIN_AI_KEY) if your host supports one. */
+return ['ROBIN_AI_KEY' => 'paste-your-key-here'];
 PHP
 
 ( cd dist && zip -qr ../robin-site.zip . )

@@ -205,31 +205,23 @@
   });
 
   /* --------------------------------------------------------------- marquee */
-  var bits = ['$ROBIN', 'ROBIN NAKAMOTO', 'ROBINHOOD CHAIN', '30% TO BILLY MARKUS',
+  var bits = ['$ROBIN', 'ROBIN NAKAMOTO', 'ROBINHOOD CHAIN', '30M TO BILLY MARKUS',
               'LIQUIDITY LOCKED', 'FIXED SUPPLY', 'STEAL FROM THE CHARTS',
               'GIVE TO THE HOLDERS', 'UNISWAP V4', 'CHAIN 4663'];
   var row = bits.map(function (b) { return '<span>' + esc(b) + '</span>'; }).join('');
   $('#marquee').innerHTML = row + row;   // duplicated for a seamless -50% loop
 
   /* ------------------------------------------------------------ tokenomics */
+  // Verifiable facts rather than an invented pie chart: each tile is something
+  // a holder can confirm on the explorer or by reading the contract.
   var tok = $('#tokList');
-  tok.innerHTML = C.distribution.map(function (d) {
-    return '<div class="tok-item lg lg-d' + (d.accent ? ' accent' : '') + '">' +
-             '<div class="tok-top"><span class="lbl">' + esc(d.label) + '</span>' +
-             '<span class="pct">' + d.pct + '%</span></div>' +
-             '<p>' + esc(d.note) + '</p>' +
-             '<div class="bar"><i data-pct="' + d.pct + '"></i></div>' +
+  tok.innerHTML = (C.supplyFacts || []).map(function (f) {
+    return '<div class="fact lg lg-d' + (f.accent ? ' accent' : '') + '">' +
+             '<div class="fact-k">' + esc(f.label) + '</div>' +
+             '<div class="fact-v">' + esc(f.value) + '</div>' +
+             '<p>' + esc(f.note) + '</p>' +
            '</div>';
   }).join('');
-
-  var barsIO = new IO(function (entries) {
-    entries.forEach(function (en) {
-      if (!en.isIntersecting) return;
-      $$('.bar i', en.target).forEach(function (b) { b.style.width = b.dataset.pct + '%'; });
-      barsIO.unobserve(en.target);
-    });
-  }, { threshold: 0.25 });
-  barsIO.observe(tok);
 
   /* ------------------------------------------------------------ buy bar */
   // Small screens only; the CSS keeps it hidden elsewhere.
