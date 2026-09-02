@@ -154,7 +154,8 @@
 
   /* -------------------------------------------------------- contract pill */
   var addr = C.token.address;
-  $('#caVal').textContent = addr;
+  $('.ca-full', $('#caVal')).textContent = addr;
+  $('.ca-short', $('#caVal')).textContent = addr.slice(0, 10) + '…' + addr.slice(-8);
   $('#fCa').textContent = shortAddr(addr);
 
   $('#caCopy').addEventListener('click', function () {
@@ -229,6 +230,23 @@
     });
   }, { threshold: 0.25 });
   barsIO.observe(tok);
+
+  /* ------------------------------------------------------------ buy bar */
+  // Small screens only; the CSS keeps it hidden elsewhere.
+  var bar = $('#buybar');
+  var swapSec = $('#swap');
+  if (bar && swapSec) {
+    document.body.classList.add('has-buybar');
+    var updateBar = function () {
+      var past = window.scrollY > window.innerHeight * 0.72;
+      var box = swapSec.getBoundingClientRect();
+      var onSwap = box.top < window.innerHeight && box.bottom > 120;
+      bar.classList.toggle('up', past && !onSwap);
+    };
+    window.addEventListener('scroll', updateBar, { passive: true });
+    window.addEventListener('resize', updateBar);
+    updateBar();
+  }
 
   /* --------------------------------------------------------------- footer */
   $('#yr').textContent = new Date().getFullYear();

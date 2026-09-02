@@ -31,8 +31,11 @@ setTimeout(() => {
   check('24h change shows +18.4%', t('#sChange')==='+18.4%', t('#sChange'));
   check('mcap shows', t('#sMcap')==='$421.4K', t('#sMcap'));
   check('liquidity shows', t('#sLiq')==='$96.2K', t('#sLiq'));
-  check('logo is an inlined data URI',
-    (d.querySelector('.hero-art img')?.getAttribute('src')||'').startsWith('data:image/svg+xml'));
+  const heroSrc = d.querySelector('.hero-art img')?.getAttribute('src') || '';
+  check('hero logo is an inlined raster data URI',
+    /^data:image\/(png|webp);base64,/.test(heroSrc), heroSrc.slice(0, 40));
+  check('animated doge is inlined',
+    /^data:image\/webp;base64,/.test(d.querySelector('#dogeAnim img')?.getAttribute('src')||''));
   // Only loadable references matter; the string may still appear in comments.
   const raw = fs.readFileSync(file,'utf8');
   const loads = raw.match(/(?:src|href)\s*=\s*["'`]assets\/[^"'`]+/g) || [];

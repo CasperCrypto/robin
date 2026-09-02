@@ -174,6 +174,15 @@
     else paint('change', els.change, (ch >= 0 ? '+' : '') + Number(ch).toFixed(1) + '%',
                ch >= 0 ? 'up' : 'down');
 
+    // mirror price into the sticky mobile buy bar
+    var bb = document.getElementById('bbPrice');
+    if (bb) {
+      var d = (ch == null || isNaN(ch)) ? ''
+        : ' <span class="d ' + (ch >= 0 ? 'up' : 'down') + '">' +
+          (ch >= 0 ? '+' : '') + Number(ch).toFixed(1) + '%</span>';
+      bb.innerHTML = RB.esc(RB.usd(state.priceUsd)) + d;
+    }
+
     paint('mcap', els.mcap, RB.usd(state.mcap));
     paint('vol',  els.vol,  RB.usd(state.vol24));
     paint('liq',  els.liq,  RB.usd(state.liq));

@@ -2,6 +2,7 @@ node_modules/
 package-lock.json
 preview.html
 dist/
+shots/
 *.zip
 
 # Never commit API keys

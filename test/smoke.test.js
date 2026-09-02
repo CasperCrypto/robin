@@ -56,7 +56,7 @@ win.fetch = (url, opts) => {
   return Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({ error: 'stub' }) });
 };
 
-['config.js','keccak.js','app.js','market.js','wallet.js','swap.js','feed.js','ai.js']
+['config.js','keccak.js','app.js','market.js','wallet.js','swap.js','feed.js','ai.js','doge.js']
   .forEach((f) => {
     try { win.eval(fs.readFileSync(path.join(root, 'assets/js', f), 'utf8')); }
     catch (e) { errors.push(`${f} threw: ${e.message}`); }
@@ -72,7 +72,12 @@ const check = (name, cond, extra = '') => {
 setTimeout(() => {
   const t = (sel) => (d.querySelector(sel)?.textContent || '').trim();
 
-  check('contract address rendered', t('#caVal') === win.ROBIN.token.address, t('#caVal'));
+  check('full contract address rendered',
+    d.querySelector('.ca-full')?.textContent === win.ROBIN.token.address,
+    d.querySelector('.ca-full')?.textContent);
+  check('truncated address rendered for small screens',
+    /^0x280413fb…d49EE75e$/.test(d.querySelector('.ca-short')?.textContent || ''),
+    d.querySelector('.ca-short')?.textContent);
   check('price populated from pair', t('#sPrice').startsWith('$'), t('#sPrice'));
   check('24h change populated', t('#sChange').includes('18.4'), t('#sChange'));
   check('market cap populated', t('#sMcap') === '$421.4K', t('#sMcap'));
@@ -98,6 +103,14 @@ setTimeout(() => {
        .includes('.rv{opacity:0'));
   check('RPC was actually called', rpcCalls > 0, `calls=${rpcCalls}`);
   check('footer year set', /^\d{4}$/.test(t('#yr')), t('#yr'));
+  check('sticky buy bar present', !!d.querySelector('#buybar'));
+  check('buy bar shows live price', /\$0\.000/.test(t('#bbPrice')), t('#bbPrice'));
+  check('meme band present', !!d.querySelector('#dogeAnim'));
+  check('animation is lazy (poster only at rest)',
+    (d.querySelector('#dogeAnim img')?.getAttribute('src')||'').includes('poster'),
+    d.querySelector('#dogeAnim img')?.getAttribute('src'));
+  check('no generated SVG art referenced',
+    !fs.readFileSync(path.join(root,'index.html'),'utf8').includes('robin-logo.svg'));
   check('unconfigured telegram link removed', d.querySelector('#fTg') === null);
   check('no dead "#" hrefs left',
     [...d.querySelectorAll('a[href="#"]')].length === 0,

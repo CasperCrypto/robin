@@ -32,22 +32,32 @@ To rebuild the zip yourself: `./package.sh` → `robin-site.zip`.
 
 ---
 
-## Drop in the real artwork
+## Artwork
 
-The site currently ships **SVG stand-ins** I drew to match your images. To use your actual
-files, save them into `assets/img/` with these exact names:
+Your real artwork ships with the site — no placeholders. Everything was derived
+from the two files you sent and optimised for the web:
 
-| File | What it is | Used for |
+| File | Size | Used for |
 |---|---|---|
-| `assets/img/robin-logo.png` | the square doge avatar | nav, hero, swap icon, footer |
-| `assets/img/robin-banner.png` | the wide `$ROBIN` banner | social / link previews |
+| `robin-logo.png` / `.webp` | 106 KB / 25 KB | hero (512px) |
+| `robin-logo-128.png` / `.webp` | 9 KB / 4 KB | nav, footer, swap token icon |
+| `robin-doge.webp` | 965 KB | the animated loop, 400px, 60 frames |
+| `robin-doge.gif` | 1.2 MB | animation fallback for older browsers |
+| `robin-doge-poster.webp` | 17 KB | first frame, shown while the loop loads |
+| `robin-banner.png` / `.webp` | 350 KB / 48 KB | link previews on X, Telegram, Discord |
+| `favicon-*.png`, `favicon.ico`, `apple-touch-icon.png` | — | browser tab and home screen |
 
-**No code change needed.** Every `<img>` already points at the `.png` first and falls back
-to the SVG only if the PNG is missing. Drop the files in and they take over.
+Your 1 MB source PNG became a 25 KB WebP, and the 9.5 MB GIF became a 965 KB
+animated WebP — same 60 frames, same 6-second loop.
 
-`assets/img/robin-buy.svg` is the "new buy" sticker, there if you want it for a buy bot.
+**The animation never blocks the page.** The 17 KB poster paints immediately and
+the loop is fetched only when the meme band scrolls into view. Anyone on a
+data-saver connection, a 2G connection, or with "reduce motion" turned on gets a
+Play button instead and downloads nothing until they tap it.
 
----
+To swap in different artwork later, replace the files in `assets/img/` keeping
+the same names. `assets/img/` also holds `robin-doge-poster.webp`, which should
+match the first frame of whatever animation you use.
 
 ## Configure it
 
@@ -67,6 +77,11 @@ Contract address, chain details and the DexScreener pool are already filled in.
 ---
 
 ## What's live on the page
+
+**Mobile** — the swap panel moves above the how-to-buy steps on a phone (it's the
+point of the section), a sticky bar with the live price and a Buy button follows
+you once you're past the hero, and the layout is checked for horizontal overflow
+at 360px, 390px and 1280px in a real browser via `npm run shots`.
 
 **Market strip** — price, 24h move, market cap, volume and liquidity, polled from the
 DexScreener API every 30s. Pauses in a background tab. Total supply is read from the
@@ -164,12 +179,15 @@ Not needed to deploy — they're here so changes stay safe.
 npm install     # ethers + jsdom, dev only
 npm test        # ABI encoding vs. ethers, then a full page boot
 npm run preview # bundles preview.html and checks it renders
+npm run shots   # renders in Chromium at 360/390/1280 and flags layout problems
 ```
 
 `test/abi.test.js` rebuilds the Universal Router calldata with ethers from the V4 spec and
 asserts our hand-rolled encoder produces identical bytes, then checks the pool-key guard
 rejects a mismatched config. `test/smoke.test.js` boots the whole page in jsdom with the
 network stubbed and asserts the DOM actually populated and nothing threw.
+`test/shots.js` renders the real site in Chromium at three widths, screenshots
+each, and reports any horizontal overflow or undersized tap targets.
 
 ---
 

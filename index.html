@@ -6,8 +6,10 @@
 <title>$ROBIN — Robin Nakamoto on Robinhood Chain</title>
 <meta name="description" content="Robin Nakamoto ($ROBIN) — the memecoin of Robinhood Chain. Live price, on-page swap, real-time buy feed and an AI that actually knows the token.">
 <meta name="theme-color" content="#A8DC2B">
-<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="assets/img/robin-logo.png">
+<link rel="icon" href="assets/img/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/img/favicon-48.png" sizes="48x48" type="image/png">
+<link rel="shortcut icon" href="assets/img/favicon.ico">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
 <link rel="canonical" href="https://shopping.io/robin">
 
 <meta property="og:type" content="website">
@@ -23,6 +25,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="assets/img/robin-logo.webp" type="image/webp" fetchpriority="high">
 <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
@@ -40,8 +43,10 @@
 <header class="nav" id="nav">
   <div class="wrap">
     <a class="brand" href="#top">
-      <img src="assets/img/robin-logo.png" alt="" width="38" height="38"
-           onerror="this.onerror=null;this.src='assets/img/robin-logo.svg'">
+      <picture>
+        <source srcset="assets/img/robin-logo-128.webp" type="image/webp">
+        <img src="assets/img/robin-logo-128.png" alt="" width="38" height="38" decoding="async">
+      </picture>
       <span>$ROBIN</span>
     </a>
     <nav class="nav-links" id="navLinks" aria-label="Primary">
@@ -71,9 +76,10 @@
         <h1 class="chrome" data-text="$ROBIN">$ROBIN</h1>
         <p class="tagline">Robin Nakamoto — steal from the charts,<br>give to the holders.</p>
         <p class="lede">
-          The memecoin native to <b>Robinhood Chain</b>. Launched through the Pons
-          bonding curve, graduated into a permanently locked Uniswap&nbsp;V4 pool,
-          and <b>30% of supply gifted to Billy Markus</b> — the man who made Dogecoin.
+          The memecoin native to <b>Robinhood Chain</b>, with
+          <b>30% of supply gifted to Billy Markus</b> — the man who made Dogecoin.<span class="lede-more">
+          Launched through the Pons bonding curve and graduated into a permanently
+          locked Uniswap&nbsp;V4 pool.</span>
         </p>
 
         <div class="hero-actions">
@@ -89,7 +95,7 @@
 
         <div class="ca lens" title="Official contract address">
           <span class="ca-label">Contract</span>
-          <span class="ca-val" id="caVal">—</span>
+          <span class="ca-val" id="caVal"><span class="ca-full"></span><span class="ca-short"></span></span>
           <button class="ca-copy" id="caCopy" type="button" aria-label="Copy contract address">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
@@ -97,9 +103,12 @@
       </div>
 
       <div class="hero-art">
-        <img class="doge" src="assets/img/robin-logo.png" width="512" height="512"
-             alt="Robin Nakamoto — a Shiba Inu in a green Robin Hood hat and black glasses"
-             onerror="this.onerror=null;this.src='assets/img/robin-logo.svg'">
+        <picture>
+          <source srcset="assets/img/robin-logo.webp" type="image/webp">
+          <img class="doge" src="assets/img/robin-logo.png" width="512" height="512"
+               fetchpriority="high" decoding="async"
+               alt="Robin Nakamoto — a Shiba Inu in a green Robin Hood hat and black glasses">
+        </picture>
         <div class="badge lens badge-a">🏹 100% locked LP</div>
         <div class="badge lens badge-b">🐕 30% → Billy</div>
       </div>
@@ -149,7 +158,7 @@
         <div class="step glass">
           <div class="n">3</div>
           <div><h4>Swap ETH → $ROBIN</h4>
-            <p>Use the panel on the right, or trade straight from
+            <p>Use the swap panel, or trade straight from
                <a href="#" id="stepPons" target="_blank" rel="noopener">Pons</a> and
                <a href="#" id="stepDex" target="_blank" rel="noopener">DexScreener</a>.
                Always check the contract matches the one in the header.</p></div>
@@ -263,6 +272,40 @@
         <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
           <a class="btn btn-glass on-dark" id="billyScan" href="#" target="_blank" rel="noopener">Verify on explorer</a>
           <a class="btn btn-glass on-dark" href="https://x.com/BillyM2k" target="_blank" rel="noopener">@BillyM2k</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════ meme band ── -->
+<section class="sec dark meme-band" id="meme" style="padding-top:0">
+  <div class="wrap">
+    <div class="band glass rv">
+      <div class="band-art">
+        <!-- Poster paints instantly; the 6-second loop is fetched only when
+             this scrolls into view, and never on a data-saver connection. -->
+        <div class="doge-anim" id="dogeAnim"
+             data-webp="assets/img/robin-doge.webp"
+             data-gif="assets/img/robin-doge.gif">
+          <img src="assets/img/robin-doge-poster.webp" width="400" height="400"
+               loading="lazy" decoding="async"
+               alt="Robin Nakamoto the Shiba Inu, animated with doge-speak captions">
+          <button class="doge-play" type="button" hidden>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            <span>Play</span>
+          </button>
+        </div>
+      </div>
+      <div class="band-copy">
+        <span class="eyebrow">much wow</span>
+        <h2>such meme.<br>much dollar.</h2>
+        <p>Robin Nakamoto is a joke that got built properly. Fixed supply, locked
+           liquidity, a real chain underneath — and a dog in a feathered hat who
+           refuses to take any of it seriously.</p>
+        <div class="band-words" aria-hidden="true">
+          <span>such meme</span><span>much dollar</span><span>very pons</span>
+          <span>so billy</span><span>wow</span>
         </div>
       </div>
     </div>
@@ -405,8 +448,10 @@
     <div class="foot-grid">
       <div>
         <a class="brand" href="#top" style="color:var(--text-inv)">
-          <img src="assets/img/robin-logo.png" alt="" width="38" height="38"
-               onerror="this.onerror=null;this.src='assets/img/robin-logo.svg'">
+          <picture>
+            <source srcset="assets/img/robin-logo-128.webp" type="image/webp">
+            <img src="assets/img/robin-logo-128.png" alt="" width="38" height="38" loading="lazy" decoding="async">
+          </picture>
           <span>$ROBIN</span>
         </a>
         <p class="about">Robin Nakamoto — the memecoin native to Robinhood Chain.
@@ -447,6 +492,14 @@
   </div>
 </footer>
 
+<div class="buybar" id="buybar">
+  <div class="bb-price">
+    <span class="bb-k">$ROBIN price</span>
+    <span class="bb-v" id="bbPrice">—</span>
+  </div>
+  <a class="btn btn-lime" href="#swap">Buy now</a>
+</div>
+
 <div class="toast-wrap" id="toasts" aria-live="polite"></div>
 
 <script src="assets/js/config.js"></script>
@@ -457,5 +510,6 @@
 <script src="assets/js/swap.js"></script>
 <script src="assets/js/feed.js"></script>
 <script src="assets/js/ai.js"></script>
+<script src="assets/js/doge.js"></script>
 </body>
 </html>

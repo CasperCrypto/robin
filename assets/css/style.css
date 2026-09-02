@@ -609,3 +609,229 @@ h2.sec-title{font-size:clamp(34px,5.2vw,62px);margin:18px 0 14px}
   .leg-row input{font-size:26px}
   .btn{padding:13px 21px;font-size:14.5px}
 }
+
+/* ══════════════════════════════════════════════════════════════ meme band */
+.band{
+  display:grid;grid-template-columns:400px 1fr;gap:44px;align-items:center;
+  padding:38px;border-radius:var(--r-xl);
+}
+.band-art{position:relative}
+.doge-anim{position:relative;border-radius:var(--r-lg);overflow:hidden;background:var(--lime-500)}
+.doge-anim img{width:100%;height:auto;display:block}
+.doge-anim.loading::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.45) 50%,transparent 70%);
+  background-size:220% 100%;animation:shimmer 1.2s linear infinite;
+}
+.doge-play{
+  position:absolute;inset:auto 0 0 0;margin:0 auto 16px;width:max-content;
+  display:flex;align-items:center;gap:8px;padding:11px 20px;border-radius:999px;
+  background:rgba(10,13,6,.82);color:var(--lime-400);font-weight:700;font-size:14px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.18);
+}
+.doge-play svg{width:15px;height:15px}
+.doge-play:hover{background:var(--lime-400);color:var(--ink)}
+
+.band-copy h2{font-size:clamp(32px,4.6vw,54px);margin:16px 0 14px}
+.band-copy p{font-size:clamp(15px,1.6vw,17.5px);color:var(--text-inv-soft);margin:0;max-width:46ch}
+.band-words{display:flex;flex-wrap:wrap;gap:9px;margin-top:24px}
+.band-words span{
+  padding:7px 15px;border-radius:999px;font-size:13.5px;font-weight:700;
+  background:rgba(255,255,255,.06);border:1px solid var(--ink-line);color:var(--lime-300);
+  font-family:var(--font-mono);
+}
+
+/* ═════════════════════════════════════════════════════ sticky mobile buy */
+/* Shown only on small screens, and only once the hero has scrolled past. */
+.buybar{
+  position:fixed;left:0;right:0;bottom:0;z-index:70;display:none;
+  align-items:center;gap:12px;
+  padding:11px 16px calc(11px + env(safe-area-inset-bottom));
+  background:rgba(10,13,6,.90);border-top:1px solid rgba(255,255,255,.12);
+  backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5);
+  transform:translateY(110%);transition:transform .3s cubic-bezier(.2,.8,.3,1);
+}
+.buybar.up{transform:none}
+.buybar .bb-price{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.buybar .bb-k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-inv-soft);font-weight:700}
+.buybar .bb-v{font-family:var(--font-display);font-weight:800;font-size:17px;color:var(--text-inv);font-variant-numeric:tabular-nums}
+.buybar .bb-v .d{font-size:12.5px;margin-left:5px;font-weight:700}
+.buybar .bb-v .d.up{color:var(--up)}.buybar .bb-v .d.down{color:var(--down)}
+.buybar .btn{margin-left:auto;flex:none;padding:13px 24px}
+
+/* ═══════════════════════════════════════════════════════════════ mobile */
+/* The contract pill shows the full address where there's room, and a
+   readable truncation where there isn't. Both are always in the DOM so a
+   copy still yields the complete address. */
+.ca-short{display:none}
+@media (max-width:640px){
+  .ca-full{display:none}
+  .ca-short{display:inline}
+}
+
+@media (max-width:1040px){
+  .band{grid-template-columns:340px 1fr;gap:34px;padding:30px}
+}
+@media (max-width:860px){
+  .band{grid-template-columns:1fr;gap:26px;padding:24px;text-align:center}
+  .band-art{max-width:340px;margin-inline:auto}
+  .band-copy p{margin-inline:auto}
+  .band-words{justify-content:center}
+}
+
+@media (max-width:900px){
+  :root{--nav-h:64px}
+  .wrap{padding-inline:18px}
+  .sec{padding:clamp(52px,8vw,80px) 0}
+}
+
+@media (max-width:640px){
+  :root{--r-lg:20px;--r-xl:26px}
+  .wrap{padding-inline:15px}
+  .sec{padding:54px 0}
+
+  /* hero */
+  .hero{padding-top:calc(var(--nav-h) + 26px);padding-bottom:38px}
+  .hero-grid{gap:30px}
+  .hero-copy h1{font-size:clamp(58px,17vw,84px)}
+  .hero-copy p.lede{font-size:15.5px;margin-top:16px}
+  .hero-art{max-width:min(252px,66vw)}
+  .hero-actions{gap:10px;margin-top:26px}
+  .hero-actions .btn{flex:1 1 100%;justify-content:center}
+  .orb-1{width:340px;height:340px;top:-120px;right:-90px}
+  .orb-2{display:none}
+
+  /* contract pill */
+  .ca{margin-top:22px;padding:9px 9px 9px 15px;gap:9px}
+  .ca-val{font-size:13px}
+  .ca-copy{width:42px;height:42px}
+
+  /* stats: three tiles read better than four cramped ones */
+  .stats{margin-top:34px;grid-template-columns:1fr 1fr}
+  .stat{padding:15px 11px}
+  .stat .k{font-size:9.5px;letter-spacing:.1em}
+  .stat .v{font-size:19px}
+
+  .marquee{padding:12px 0}
+  .marquee span{font-size:14px;gap:30px}
+  .marquee-track{gap:30px}
+
+  /* section headings */
+  h2.sec-title{font-size:clamp(30px,8.4vw,40px)}
+  .sec-head{margin-bottom:30px}
+  .sec-sub{font-size:15px}
+
+  /* swap */
+  .swap-layout{gap:26px}
+  .swap{padding:16px;border-radius:22px}
+  .leg{padding:14px}
+  .leg-row input{font-size:27px}
+  .leg-top{font-size:11.5px}
+  .coin{padding:7px 12px 7px 7px;font-size:14px}
+  .coin img,.coin .ico{width:23px;height:23px}
+  .presets{gap:7px}
+  .presets button{min-width:0;flex:1 1 calc(50% - 4px);padding:11px 6px}
+  .swap-meta{font-size:12.5px}
+  .slip button{padding:6px 11px}          /* keep the tap target honest */
+  .step{padding:17px;gap:13px}
+  .step h4{font-size:16px}
+  .step p{font-size:14px}
+
+  /* live feed */
+  .feed-head{padding:15px 16px}
+  .feed-head h3{font-size:16px}
+  .buy{padding:12px 16px;gap:11px}
+  .buy .emo{width:36px;height:36px;font-size:19px}
+  .buy .amt{font-size:14.5px}
+  .buy .sub{font-size:11px}
+  .buy .when{font-size:11px}
+  .feed-list{max-height:360px}
+
+  /* tokenomics */
+  .tok-item{padding:17px}
+  .tok-top .lbl{font-size:15.5px}
+  .tok-top .pct{font-size:22px}
+  .billy{padding:26px 20px}
+  .billy .ring{width:88px;height:88px;font-size:40px;margin-bottom:16px}
+  .billy .quote{font-size:14px;padding:15px 17px}
+
+  /* ai */
+  .ai-panel{padding:18px;min-height:0}
+  .ai-tabs{gap:6px}
+  .ai-tab{padding:10px 15px;font-size:13.5px}
+  .ai-log{max-height:300px}
+  .msg .bub{max-width:88%;font-size:14px;padding:11px 14px}
+  .msg .av{width:30px;height:30px;font-size:15px}
+  .ai-form{gap:8px}
+  .ai-form input{padding:13px 16px;font-size:16px}   /* 16px stops iOS zooming */
+  .ai-form .btn{padding:13px 18px}
+  .ai-out{padding:16px;font-size:14px;max-height:300px}
+
+  /* faq */
+  .q summary{padding:16px 18px;font-size:15.5px}
+  .q .a{padding:0 18px 18px;font-size:14px}
+
+  /* footer */
+  .foot{padding:44px 0 26px}
+  .foot-grid{margin-bottom:30px}
+  .foot-bot{font-size:11.5px;gap:10px}
+  .disclaimer{font-size:11.5px;padding:15px 16px}
+
+  /* clear the sticky buy bar */
+  body.has-buybar .foot{padding-bottom:calc(26px + 74px + env(safe-area-inset-bottom))}
+  .buybar{display:flex}
+}
+
+@media (max-width:380px){
+  .wrap{padding-inline:13px}
+  .hero-copy h1{font-size:15.5vw}
+  .stat .v{font-size:17px}
+  .buybar .btn{padding:12px 18px;font-size:14px}
+  .buybar .bb-v{font-size:15.5px}
+  .band-words span{font-size:12.5px;padding:6px 12px}
+}
+
+/* Landscape phones: the hero shouldn't eat the whole screen. */
+@media (max-height:520px) and (orientation:landscape){
+  .hero{padding-top:calc(var(--nav-h) + 18px);padding-bottom:26px}
+  .hero-art{max-width:210px}
+  .hero-copy h1{font-size:52px}
+}
+
+/* Coarse pointers get real tap targets and no hover-only affordances. */
+@media (hover:none){
+  .btn:hover{transform:none}
+  .nav-links a:hover{background:none}
+  .marquee:hover .marquee-track{animation-play-state:running}
+  .ca-copy:hover{transform:none}
+  .flip button:hover{transform:none}
+}
+
+/* ═════════════════════════════════════════════ post-render mobile fixes */
+/* An author `display` beats the UA's [hidden] rule, so state it explicitly. */
+.doge-play[hidden]{display:none}
+
+/* Touch devices get real tap targets on the small controls. */
+@media (hover:none){
+  .leg-max{padding:6px 10px;margin:-6px -6px -6px 0}
+  .slip button{padding:9px 14px}
+  .presets button{padding:13px 8px}
+  .ai-chips button,.meme .acts button{padding:10px 16px}
+  .q summary{padding-block:18px}
+}
+
+@media (max-width:640px){
+  /* The swap panel is the point of the section — it goes first on a phone,
+     with the how-to-buy steps underneath for anyone who needs them. */
+  .swap-layout{display:flex;flex-direction:column}
+  .swap-layout .swap{order:1}
+  .swap-layout .steps{order:2}
+
+  /* Hero: tighter, and the two calls to action share a row. */
+  .hero-copy .tagline{font-size:17.5px;font-weight:700;margin-top:10px;line-height:1.32}
+  .hero-copy p.lede{font-size:15px;line-height:1.58;margin-top:14px}
+  .lede-more{display:none}
+  .hero-actions .btn{flex:1 1 calc(50% - 5px);padding:15px 14px;font-size:15px}
+  .eyebrow{font-size:10.5px;padding:6px 12px;letter-spacing:.12em}
+}

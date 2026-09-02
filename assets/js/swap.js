@@ -149,7 +149,8 @@
   var S = { dir: 'buy', slippage: C.swap.slippageDefault || 5, busy: false, bal: {} };
 
   var ICON_ETH = '<svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="12" r="12" fill="#627eea"/><path d="M12 3.5v6.3l5.2 2.3z" fill="#fff" fill-opacity=".6"/><path d="M12 3.5L6.8 12.1 12 9.8z" fill="#fff"/><path d="M12 16.1v4.4l5.2-7.2z" fill="#fff" fill-opacity=".6"/><path d="M12 20.5v-4.4l-5.2-2.8z" fill="#fff"/><path d="M12 15.1l5.2-3-5.2-2.3z" fill="#fff" fill-opacity=".2"/><path d="M6.8 12.1l5.2 3V9.8z" fill="#fff" fill-opacity=".6"/></svg>';
-  var ICON_ROBIN = '<img src="assets/img/robin-logo.png" width="26" height="26" alt="" style="border-radius:50%" onerror="this.onerror=null;this.src=\'assets/img/robin-logo.svg\'">';
+  var ICON_ROBIN = '<img src="assets/img/robin-logo-128.png" width="26" height="26" alt="" ' +
+                   'style="border-radius:50%" loading="lazy" decoding="async">';
 
   function note(text, kind) {
     var icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>';
