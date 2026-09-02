@@ -9,7 +9,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const API_BASE = 'https://api.concentrate.ai/api/v1/chat/completions';
+// Your provider's API root, no trailing slash, no endpoint path. If your docs
+// show a different root, this is the only line you need to change.
+const API_ROOT = 'https://api.concentrate.ai/api/v1';
+const PATH_CHAT = '/chat/completions';
 const MODEL = 'google/gemini-2.5-flash-image';
 const MAX_PROMPT = 400;
 const RATE_MAX = 8;
@@ -68,6 +71,7 @@ function extractImage(j) {
     }
   }
   if (j?.data?.[0]?.b64_json) return 'data:image/png;base64,' + j.data[0].b64_json;
+  if (j?.data?.[0]?.url) return j.data[0].url;
   return null;
 }
 
@@ -107,7 +111,7 @@ export default async function handler(req, res) {
   if (ref) content.push({ type: 'image_url', image_url: { url: ref } });
 
   try {
-    const r = await fetch(API_BASE, {
+    const r = await fetch(API_ROOT + PATH_CHAT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

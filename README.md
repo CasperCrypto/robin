@@ -148,23 +148,40 @@ Your API key must never reach the browser. `api/ai.php` holds it server-side.
 in the host's environment variables, and change `ai.endpoint` in `config.js`
 to `'api/ai'`.
 
+### Check your setup before anything else
+
+After uploading, open this in a browser:
+
+```
+https://shopping.io/robin/api/ai.php?selftest=1
+```
+
+It prints a plain-text report: whether the key was found (masked), whether your
+API root answers, and **which of your models can output images** — with the
+right value to paste into `ai.model`. Add `&image=1` to also run one real
+generation and confirm a picture actually comes back.
+
+It never prints your key, only its first few characters so you can tell which
+one is loaded.
+
+Read the report top to bottom; it names the fix for each failure:
+
+| What it says | What to do |
+|---|---|
+| `KEY MISSING` | Set `ROBIN_AI_KEY`, or create `api/config.php` |
+| `HTTP 401` / `403` | The key was rejected — check it is active |
+| `HTTP 404` on `/models` | Your API root differs — change `API_ROOT` at the top of `api/ai.php` |
+| `CONNECT tunnel failed` | Your host blocks outbound HTTPS — ask them to allow it |
+| `RESULT NO IMAGE` + text | You pointed at a text model; pick one from the list it printed |
+
 ### Picking a model
 
 `ai.model` in `config.js` must name a model that **accepts an input image and
-returns an image**. The default is `google/gemini-2.5-flash-image`.
+returns an image**. The default is `google/gemini-2.5-flash-image`. The self-test
+above lists what your key can actually reach — use that rather than guessing.
 
-To see what your key can actually reach:
-
-```bash
-curl -s https://api.concentrate.ai/api/v1/models \
-  -H "Authorization: Bearer $ROBIN_AI_KEY" | grep -i image
-```
-
-If you point it at a text-only model the site says so plainly rather than
-failing silently — the error names the problem.
-
-The endpoint base is `API_BASE` at the top of `api/ai.php` (and `api/ai.js`).
-Change it there if your provider uses a different URL.
+`API_ROOT` at the top of `api/ai.php` (and `api/ai.js`) is the provider's API
+root with no endpoint path. Change it there if your docs show a different one.
 
 ### Cost control
 

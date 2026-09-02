@@ -25,7 +25,17 @@ header('Referrer-Policy: same-origin');
 header('Cache-Control: no-store');
 
 // ── config ────────────────────────────────────────────────────────────────
-const API_BASE   = 'https://api.concentrate.ai/api/v1/chat/completions';
+/**
+ * Your provider's API root, WITHOUT a trailing slash and without an endpoint
+ * path. Everything else is derived from it. If your docs show a different
+ * root, this is the only line you need to change.
+ */
+const API_ROOT   = 'https://api.concentrate.ai/api/v1';
+
+/** Endpoint paths appended to API_ROOT. */
+const PATH_CHAT   = '/chat/completions';
+const PATH_MODELS = '/models';
+
 const MODEL      = 'google/gemini-2.5-flash-image';
 const REF_IMAGE  = __DIR__ . '/../assets/img/robin-logo.png';
 
@@ -54,6 +64,164 @@ function apiKey(): string {
         }
     }
     return '';
+}
+
+// ── self-test ─────────────────────────────────────────────────────────────
+/**
+ * Open  api/ai.php?selftest=1        in a browser to check the setup.
+ * Add   &image=1                     to also spend one real image generation.
+ *
+ * It reports whether the key is found, whether the API root answers, which of
+ * your models can output images, and (optionally) whether a generation really
+ * comes back. The key itself is never printed — only its first few characters
+ * so you can tell which one is loaded.
+ */
+if (isset($_GET['selftest'])) {
+    header('Content-Type: text/plain; charset=utf-8');
+
+    $line = fn(string $l = '') => print($l . "\n");
+    $line('$ROBIN meme forge — self test');
+    $line(str_repeat('=', 46));
+    $line();
+
+    $key = apiKey();
+    if ($key === '') {
+        $line('KEY        MISSING');
+        $line();
+        $line('Set ROBIN_AI_KEY as an environment variable, or create');
+        $line('api/config.php containing:');
+        $line("    <?php return ['ROBIN_AI_KEY' => 'your-key'];");
+        exit;
+    }
+    $line('KEY        found (' . substr($key, 0, 8) . '…, ' . strlen($key) . ' chars)');
+    $line('API ROOT   ' . API_ROOT);
+    $line('MODEL      ' . MODEL);
+    $line('PHP        ' . PHP_VERSION . (function_exists('curl_init') ? ', cURL ok' : ', cURL MISSING'));
+    $line('REF IMAGE  ' . (is_readable(REF_IMAGE) ? 'ok' : 'NOT READABLE at ' . REF_IMAGE));
+    $line();
+
+    // ── can we list models? ──────────────────────────────────────────────
+    $line('--- ' . API_ROOT . PATH_MODELS . ' ---');
+    $ch = curl_init(API_ROOT . PATH_MODELS);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $key, 'Accept: application/json'],
+    ]);
+    $raw  = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $cerr = curl_error($ch);
+    curl_close($ch);
+
+    if ($raw === false) {
+        $line('FAILED     ' . $cerr);
+        $line('           Your host may block outbound HTTPS. Ask them to allow it.');
+    } else {
+        $line('HTTP       ' . $code);
+        $j = json_decode((string)$raw, true);
+        $models = $j['data'] ?? (is_array($j) && isset($j[0]) ? $j : null);
+
+        if ($code === 401 || $code === 403) {
+            $line('           The key was rejected. Check it is the right one and still active.');
+        } elseif ($code === 404) {
+            $line('           No /models here. Your API root is probably different —');
+            $line('           change API_ROOT at the top of this file to match your docs.');
+        } elseif (is_array($models)) {
+            $line('MODELS     ' . count($models) . ' visible');
+            $img = [];
+            foreach ($models as $m) {
+                $id = is_array($m) ? ($m['id'] ?? '') : (string)$m;
+                if ($id === '') continue;
+                $blob = strtolower(json_encode($m));
+                // either the id looks like an image model, or it declares image output
+                if (strpos($blob, '"image"') !== false || preg_match('/image|dall|flux|imagen|sdxl|stable-diffusion/i', $id)) {
+                    $img[] = $id;
+                }
+            }
+            if ($img) {
+                $line();
+                $line('IMAGE-CAPABLE MODELS (put one in ai.model in assets/js/config.js):');
+                foreach (array_slice($img, 0, 40) as $id) $line('    ' . $id);
+                $line();
+                $line(in_array(MODEL, $img, true)
+                    ? 'Your configured model IS in the list. Good.'
+                    : 'NOTE: "' . MODEL . '" is not in that list. Pick one from above.');
+            } else {
+                $line();
+                $line('No obviously image-capable model found. Check your provider docs');
+                $line('for the right model id, then set it in assets/js/config.js.');
+            }
+        } else {
+            $line('           Unexpected response shape. First 400 chars:');
+            $line('           ' . substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 400));
+        }
+    }
+
+    // ── optionally spend one real generation ─────────────────────────────
+    if (isset($_GET['image'])) {
+        $line();
+        $line('--- live image test (this costs one generation) ---');
+        $content = [['type' => 'text', 'text' => 'Draw a simple green circle on a white background.']];
+        $ch = curl_init(API_ROOT . PATH_CHAT);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_POSTFIELDS => json_encode([
+                'model' => MODEL,
+                'modalities' => ['image', 'text'],
+                'messages' => [['role' => 'user', 'content' => $content]],
+            ]),
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $key],
+        ]);
+        $raw  = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $line('HTTP       ' . $code);
+        $j = json_decode((string)$raw, true);
+        $img = extractImage(is_array($j) ? $j : []);
+        if ($img) {
+            $line('RESULT     an image came back (' . strlen($img) . ' chars of data URL)');
+            $line();
+            $line('Everything works. The meme forge is ready.');
+        } else {
+            $said = $j['choices'][0]['message']['content'] ?? '';
+            $line('RESULT     NO IMAGE');
+            if (is_string($said) && $said !== '') {
+                $line('           The model replied with text instead:');
+                $line('           "' . substr(trim($said), 0, 200) . '"');
+                $line('           That means it is a text model. Pick an image model above.');
+            } else {
+                $line('           Raw response, first 500 chars:');
+                $line('           ' . substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 500));
+            }
+        }
+    } else {
+        $line();
+        $line('Add &image=1 to the URL to also run a real generation test.');
+    }
+    exit;
+}
+
+/**
+ * Providers differ in where they put a generated image, so accept the common
+ * shapes rather than betting on one. Returns a data/https URL, or null.
+ */
+function extractImage(array $j): ?string {
+    $msg = $j['choices'][0]['message'] ?? [];
+    if (!empty($msg['images'][0]['image_url']['url'])) return $msg['images'][0]['image_url']['url'];
+    if (!empty($msg['images'][0]['url']))              return $msg['images'][0]['url'];
+    if (is_array($msg['content'] ?? null)) {
+        foreach ($msg['content'] as $part) {
+            if (!empty($part['image_url']['url'])) return $part['image_url']['url'];
+            if (($part['type'] ?? '') === 'output_image' && !empty($part['data'])) {
+                return 'data:image/png;base64,' . $part['data'];
+            }
+        }
+    }
+    if (!empty($j['data'][0]['b64_json'])) return 'data:image/png;base64,' . $j['data'][0]['b64_json'];
+    if (!empty($j['data'][0]['url']))      return $j['data'][0]['url'];
+    return null;
 }
 
 // ── method, rate limit, input ─────────────────────────────────────────────
@@ -122,7 +290,7 @@ $payload = [
 $origin = (($_SERVER['HTTPS'] ?? '') === 'on' ? 'https://' : 'http://')
         . ($_SERVER['HTTP_HOST'] ?? 'shopping.io');
 
-$ch = curl_init(API_BASE);
+$ch = curl_init(API_ROOT . PATH_CHAT);
 curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_RETURNTRANSFER => true,
@@ -152,24 +320,7 @@ if ($code !== 200) {
 }
 
 // ── pull the image out of the response ────────────────────────────────────
-// Providers differ slightly, so accept the common shapes rather than one.
-$msg = $j['choices'][0]['message'] ?? [];
-$url = null;
-
-if (!empty($msg['images'][0]['image_url']['url'])) {
-    $url = $msg['images'][0]['image_url']['url'];
-} elseif (!empty($msg['images'][0]['url'])) {
-    $url = $msg['images'][0]['url'];
-} elseif (is_array($msg['content'] ?? null)) {
-    foreach ($msg['content'] as $part) {
-        if (!empty($part['image_url']['url'])) { $url = $part['image_url']['url']; break; }
-        if (($part['type'] ?? '') === 'output_image' && !empty($part['data'])) {
-            $url = 'data:image/png;base64,' . $part['data']; break;
-        }
-    }
-} elseif (!empty($j['data'][0]['b64_json'])) {
-    $url = 'data:image/png;base64,' . $j['data'][0]['b64_json'];
-}
+$url = extractImage($j);
 
 if (!$url) {
     // The model answered with words instead of a picture — usually the wrong model.
