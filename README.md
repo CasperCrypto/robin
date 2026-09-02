@@ -135,13 +135,25 @@ bigger animal. Pin the pool with `market.poolContract` to skip the detection.
 
 Finding them is a search, not a single query: the feed walks backwards from the
 head in windows — up to 20 of them, within a 20-second budget — until it has
-enough buys to fill the section. A single window was not enough, because an RPC
-that refuses a wide query leaves you with a few hundred blocks, and a few
-hundred quiet blocks means an empty feed.
+enough buys to fill the section. The last 25 are kept in the visitor's browser
+so history survives a reload, and once buys are on screen they stay there.
 
-The last 25 are also kept in the visitor's own browser, so history survives a
-reload or a quiet hour, and once buys are on screen they stay there.
-`market.feedRows` sets how many are displayed.
+> **If the feed is empty, it is almost always CORS.** A browser can only call
+> the chain RPC directly when that endpoint sends CORS headers, and many do not
+> — every call then fails silently, taking the buy feed, the balances and the
+> on-chain supply with it. `api/rpc.php` is a same-origin relay for exactly this
+> case: the site tries the RPC directly first and falls back to the relay only
+> when it has to, so it costs nothing when CORS is already open. The relay
+> passes through a fixed list of read-only methods and refuses everything else,
+> so publishing it grants nobody anything they could not do by calling the
+> public RPC themselves. Set `chain.relay: ''` to turn it off.
+
+**Buy notifications** — each buy also pops up in the corner: the amount, what it
+cost, who, linked to the transaction. On load the recent ones replay one at a
+time so the page opens with evidence rather than a static number, and after that
+only real ones appear. Never more than three on screen, and a chain with no buys
+shows nothing at all rather than inventing activity. Tune or disable it under
+`market.popups`.
 
 **Connect wallet** — a picker rather than a guess, in up to three groups:
 wallets already in the browser (discovered via EIP-6963, listed with their own

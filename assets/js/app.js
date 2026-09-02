@@ -243,7 +243,10 @@
       var past = window.scrollY > window.innerHeight * 0.72;
       var box = swapSec.getBoundingClientRect();
       var onSwap = box.top < window.innerHeight && box.bottom > 120;
-      bar.classList.toggle('up', past && !onSwap);
+      var up = past && !onSwap;
+      bar.classList.toggle('up', up);
+      // The buy notifications sit above the bar when it is showing.
+      document.body.classList.toggle('bar-up', up);
     };
     window.addEventListener('scroll', updateBar, { passive: true });
     window.addEventListener('resize', updateBar);

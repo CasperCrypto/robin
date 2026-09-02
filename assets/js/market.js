@@ -7,20 +7,31 @@
   var C = window.ROBIN, RB = window.RB, $ = RB.$;
 
   /* ------------------------------------------------------------ JSON-RPC */
+  /*
+     The public chain RPC only works from a browser if it sends CORS headers,
+     and plenty of endpoints do not. When that is the case every call fails
+     silently — no balances, no supply, and an empty buy feed. So the relay on
+     our own origin is kept as a fallback: it is never used while the direct
+     call works, and takes over the moment it does not.
+  */
   var rpcUrls = [C.chain.rpc].concat(C.chain.rpcBackup || []).filter(Boolean);
+  if (C.chain.relay) rpcUrls.push(C.chain.relay);
+
   var rpcId = 0;
+  var preferred = 0;          // index of the endpoint that last worked
 
-  /**
-   * Single JSON-RPC call. Walks the configured endpoints until one answers,
-   * so a flaky primary RPC doesn't take the page down with it.
-   */
   function rpc(method, params) {
-    var attempt = function (i) {
-      if (i >= rpcUrls.length) return Promise.reject(new Error('All RPC endpoints failed'));
-      var ctl = new AbortController();
-      var timer = setTimeout(function () { ctl.abort(); }, 12000);
+    var tried = 0;
 
-      return fetch(rpcUrls[i], {
+    var attempt = function (i) {
+      if (tried++ >= rpcUrls.length) {
+        return Promise.reject(new Error('No reachable RPC endpoint'));
+      }
+      var url = rpcUrls[i % rpcUrls.length];
+      var ctl = new AbortController();
+      var timer = setTimeout(function () { ctl.abort(); }, 15000);
+
+      return fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method: method, params: params || [] }),
@@ -33,15 +44,20 @@
         })
         .then(function (j) {
           if (j.error) throw new Error(j.error.message || 'RPC error');
+          preferred = i % rpcUrls.length;   // remember what worked
           return j.result;
         })
         .catch(function (e) {
           clearTimeout(timer);
-          if (i + 1 < rpcUrls.length) return attempt(i + 1);
-          throw e;
+          // A CORS rejection surfaces as a TypeError with no status; either
+          // way the next endpoint is worth a try.
+          return attempt(i + 1);
         });
     };
-    return attempt(0);
+
+    return attempt(preferred).catch(function () {
+      return Promise.reject(new Error('No reachable RPC endpoint'));
+    });
   }
 
   /* ---------------------------------------------------------- abi helpers */

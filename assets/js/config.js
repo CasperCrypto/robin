@@ -27,6 +27,11 @@ window.ROBIN = {
     rpc:       'https://rpc.mainnet.chain.robinhood.com',
     // Optional extra RPCs — used as automatic failover if the first is slow.
     rpcBackup: [],
+    /* Same-origin relay, used only if the direct RPC above cannot be reached
+     * from the browser — which is what happens when the endpoint sends no CORS
+     * headers, and is the usual reason the live buy feed comes up empty.
+     * Set to '' to disable it. */
+    relay: 'api/rpc.php',
     explorer:  'https://robinhoodchain.blockscout.com',
     currency:  { name: 'Ether', symbol: 'ETH', decimals: 18 }
   },
@@ -45,7 +50,17 @@ window.ROBIN = {
     showSells: false,
     // How many buys to display. The last 25 are remembered in the visitor's
     // browser so the feed keeps history through reloads and quiet spells.
-    feedRows: 12
+    feedRows: 12,
+
+    /* Corner notifications for buys. On load the recent ones replay one at a
+     * time, then live ones appear as they land. Nothing is shown if there are
+     * no real buys to show. */
+    popups: {
+      enabled: true,
+      replay: 5,        // how many to replay when the page opens
+      gapMs: 1900,      // spacing between replayed ones
+      holdMs: 6500      // how long each stays up
+    }
   },
 
   /* ----------------------------------------------------------------- swap */

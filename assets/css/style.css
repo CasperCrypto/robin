@@ -986,3 +986,73 @@ body.has-buybar .foot{padding-bottom:calc(26px + 70px + env(safe-area-inset-bott
 .wrow-sm{padding:11px 14px}
 .wrow-sm .wrow-ico{width:32px;height:32px;border-radius:9px}
 .wrow-sm .wrow-txt b{font-size:14.5px}
+
+/* ══════════════════════════════════════════════════════ buy notifications */
+.buypop-wrap{
+  position:fixed;z-index:150;
+  left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;gap:8px;
+  pointer-events:none;
+  transition:bottom .3s var(--ease);
+}
+/* lift clear of the sticky buy bar while it is showing */
+body.bar-up .buypop-wrap{bottom:calc(80px + env(safe-area-inset-bottom))}
+
+.buypop{
+  display:flex;align-items:center;gap:12px;
+  padding:11px 14px;border-radius:var(--r-md);
+  background:linear-gradient(150deg,rgba(26,34,14,.96),rgba(8,11,5,.96));
+  border:1px solid rgba(168,220,43,.34);
+  box-shadow:0 16px 40px -16px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.09);
+  backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);
+  color:var(--text-inv);pointer-events:auto;overflow:hidden;
+  /* start off-stage; .in brings it home */
+  opacity:0;transform:translateX(-24px) scale(.94);
+  transition:opacity .34s var(--ease-out),transform .42s var(--ease-out);
+}
+.buypop.in{opacity:1;transform:none}
+.buypop.out{opacity:0;transform:translateX(-16px) scale(.96)}
+
+/* a sheen crosses each card once as it arrives */
+.buypop::after{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(104deg,transparent 34%,rgba(168,220,43,.20) 50%,transparent 66%);
+  background-size:240% 100%;background-position:200% 0;
+}
+.buypop.in::after{animation:sweep 1.5s var(--ease-out) .25s 1}
+
+.bp-emo{
+  flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
+  font-size:21px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.22);
+}
+.bp-body{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.bp-top{font-size:10.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--text-inv-mute)}
+.bp-top b{color:var(--lime-300);font-weight:800}
+.bp-amt{
+  font-family:var(--font-display);font-weight:800;font-size:16px;letter-spacing:-.02em;
+  color:var(--up);font-variant-numeric:tabular-nums;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.bp-sub{font-size:11px;color:var(--text-inv-mute);font-family:var(--font-mono)}
+
+/* the bigger the bag, the louder the card */
+.buypop.big{border-color:rgba(168,220,43,.55)}
+.buypop.big .bp-emo{background:rgba(168,220,43,.18);border-color:rgba(168,220,43,.34)}
+.buypop.whale{
+  border-color:rgba(255,212,71,.6);
+  box-shadow:0 18px 46px -16px rgba(0,0,0,.95),0 0 0 1px rgba(255,212,71,.2),
+             inset 0 1px 0 rgba(255,255,255,.12);
+}
+.buypop.whale .bp-emo{background:rgba(255,212,71,.16);border-color:rgba(255,212,71,.34);font-size:23px}
+.buypop.whale .bp-amt{color:var(--gold)}
+.buypop.whale .bp-top b{color:var(--gold)}
+
+@media (hover:hover) and (pointer:fine){
+  .buypop:hover{transform:translateX(3px)}
+}
+
+@media (min-width:700px){
+  /* the bar is a phone affordance, so there is nothing to clear here */
+  .buypop-wrap,
+  body.bar-up .buypop-wrap{left:20px;right:auto;bottom:20px;width:310px}
+}

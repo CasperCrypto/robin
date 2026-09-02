@@ -164,6 +164,11 @@
     }).join('');
   }
 
+  var buyListeners = [];
+  function announceBuy(row) {
+    buyListeners.forEach(function (fn) { try { fn(row); } catch (e) {} });
+  }
+
   function ingest(logs, announce) {
     var added = 0;
     logs.forEach(function (l) {
@@ -181,12 +186,7 @@
       S.seen[key] = true;
       S.rows.unshift(row);
       added++;
-      if (announce && row.buy) {
-        var price = RB.market.state.priceUsd;
-        var usd = price ? row.amount * price : null;
-        RB.toast('New buy: ' + RB.num(row.amount) + ' ROBIN' + (usd ? ' (' + RB.usd(usd, { money: true }) + ')' : ''),
-                 'ok', { href: RB.scan('tx', row.tx), text: 'View' });
-      }
+      if (announce && row.buy) announceBuy(row);
     });
     if (added) {
       S.rows.sort(function (a, b) { return (b.block || 0) - (a.block || 0); });
@@ -293,7 +293,11 @@
   if (S.rows.length) { render(); meta('showing recent buys', false); }
   else { meta('connecting…', false); }
 
-  backfill().catch(function () {
+  var readyResolve;
+  var readyPromise = new Promise(function (res) { readyResolve = res; });
+
+  backfill().then(function () { readyResolve(); }, function () { readyResolve(); })
+  .catch(function () {
     meta(S.rows.length ? 'showing saved buys' : 'chain unreachable', false);
     if (!S.rows.length) {
       listEl.innerHTML = '<div class="feed-empty">Could not reach the Robinhood Chain RPC from this browser.<br>' +
@@ -301,6 +305,15 @@
         '" target="_blank" rel="noopener" style="color:var(--lime-400)">open DexScreener</a>.</div>';
     }
   });
+
+  window.RB.feed = {
+    /** Called with each newly seen buy, as it lands. */
+    onBuy: function (fn) { buyListeners.push(fn); },
+    /** The most recent buys we know about, newest first. */
+    recent: function (n) { return S.rows.filter(function (r) { return r.buy; }).slice(0, n || 8); },
+    /** Resolves once the first scan has finished, so a replay has data. */
+    ready: function () { return readyPromise; }
+  };
 
   setInterval(poll, 12000);
   setInterval(function () { if (S.rows.length) render(); }, 30000);   // refresh "ago" labels
