@@ -11,3 +11,4 @@ api/config.local.php
 .env
 .env.*
 shots/
+api/data/arena.sqlite*

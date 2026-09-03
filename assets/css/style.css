@@ -878,190 +878,138 @@ body.has-buybar .foot{padding-bottom:calc(26px + 70px + env(safe-area-inset-bott
   position:relative;display:flex;flex-direction:column;gap:14px;
   padding:16px;border-radius:var(--r-2xl);
 }
-/* the whole card answers a win, once */
 .arena.won{animation:arwin .9s var(--ease-out) 1}
 @keyframes arwin{
-  0%  {box-shadow:0 0 0 0 rgba(61,220,132,.55)}
-  100%{box-shadow:0 0 0 26px rgba(61,220,132,0)}
+  0%  {box-shadow:0 0 0 0 rgba(168,220,43,.55)}
+  100%{box-shadow:0 0 0 26px rgba(168,220,43,0)}
 }
-.ar-burst{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+.ar-burst{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6}
 
-/* ------------------------------------------------------- the running round */
-.ar-live{display:flex;align-items:center;gap:16px}
-
-.ar-ring{position:relative;flex:none;width:96px;height:96px}
-.ar-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
-.ar-ring circle{fill:none;stroke-width:7;stroke-linecap:round}
-.ar-ring-bg{stroke:rgba(255,255,255,.10)}
-.ar-ring-fg{
-  stroke:var(--lime-400);
-  stroke-dasharray:326.7;      /* 2πr, r = 52 */
-  stroke-dashoffset:0;
-  transition:stroke-dashoffset 1s linear;
+.ar-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.ar-round{font-family:var(--font-mono);font-size:12px;color:var(--text-inv-mute)}
+.ar-timer{display:flex;align-items:baseline;gap:7px}
+.ar-timer b{
+  font-family:var(--font-display);font-weight:800;font-size:21px;letter-spacing:-.03em;
+  color:var(--text-inv);font-variant-numeric:tabular-nums;
 }
-.ar-clock{
-  position:absolute;inset:0;display:grid;place-items:center;
-  font-family:var(--font-display);font-weight:800;font-size:21px;
-  letter-spacing:-.03em;color:var(--text-inv);font-variant-numeric:tabular-nums;
-}
-/* the last ten seconds */
-.arena.closing .ar-ring-fg{stroke:var(--gold)}
-.arena.closing .ar-clock{color:var(--gold);animation:arpulse 1s var(--ease) infinite}
-@keyframes arpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+.ar-timer em{font-style:normal;font-size:11px;color:var(--text-inv-mute)}
+.arena.closing .ar-timer b{color:var(--gold);animation:arpulse 1s var(--ease) infinite}
+@keyframes arpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
 
-.ar-now{display:flex;flex-direction:column;gap:2px;min-width:0}
-.ar-round{font-family:var(--font-mono);font-size:11px;color:var(--text-inv-mute)}
-.ar-price{
+/* --------------------------------------------------------------- the wheel */
+.ar-stage{position:relative;width:100%;max-width:236px;margin:2px auto;aspect-ratio:1}
+.ar-wheelbox{width:100%;height:100%;display:block}
+/* The slices are drawn from twelve o'clock clockwise, which is where the
+   pointer sits, so the published ticket maps straight onto a screen angle. */
+.ar-wheel{transform-origin:60px 60px;transform:rotate(0deg)}
+.ar-wheel circle{fill:none;stroke-width:15}
+.ar-arc-empty{stroke:rgba(255,255,255,.07)}
+
+.ar-pointer{
+  position:absolute;top:-2px;left:50%;transform:translateX(-50%);z-index:3;
+  width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;
+  border-top:15px solid var(--lime-300);
+  filter:drop-shadow(0 2px 5px rgba(0,0,0,.7));
+}
+.ar-center{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:1px;pointer-events:none;
+}
+.ar-center b{
   font-family:var(--font-display);font-weight:800;font-size:27px;letter-spacing:-.03em;
-  color:var(--text-inv);font-variant-numeric:tabular-nums;line-height:1.1;
+  color:var(--text-inv);font-variant-numeric:tabular-nums;line-height:1;
 }
-.ar-price.f-up  {animation:arflash-u .5s var(--ease-out) 1}
-.ar-price.f-down{animation:arflash-d .5s var(--ease-out) 1}
-@keyframes arflash-u{0%{color:var(--up);transform:translateY(-2px)}100%{color:var(--text-inv)}}
-@keyframes arflash-d{0%{color:var(--down);transform:translateY(2px)}100%{color:var(--text-inv)}}
-.ar-delta{font-size:13px;font-weight:700;color:var(--text-inv-mute);font-variant-numeric:tabular-nums}
-.ar-delta.up{color:var(--up)}
-.ar-delta.down{color:var(--down)}
-.ar-lock{font-family:var(--font-mono);font-size:11px;color:var(--text-inv-mute)}
+.ar-center span{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-inv-mute)}
+.arena.spinning .ar-center b{color:var(--lime-300)}
 
-/* ------------------------------------------------------------ Robin's call */
-.ar-robin{
-  display:flex;gap:12px;align-items:center;
-  padding:12px 14px;border-radius:14px;
-  background:var(--gd-fill);border:1px solid var(--gd-rim);
-}
-.ar-robin img{width:44px;height:44px;border-radius:12px;flex:none}
-.ar-robin > div{display:flex;flex-direction:column;gap:2px;min-width:0}
-.ar-robin-head{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-inv-mute)}
-.ar-robin-side{font-family:var(--font-display);font-size:14px;letter-spacing:0}
-.ar-robin-side.up{color:var(--up)}
-.ar-robin-side.down{color:var(--down)}
-.ar-robin-note{font-size:13px;line-height:1.45;color:var(--text-inv-soft)}
-
-/* ------------------------------------------------------------- the choice */
-.ar-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.ar-btn{
-  display:flex;flex-direction:column;align-items:center;gap:3px;
-  padding:18px 12px;border-radius:18px;
-  background:var(--gd-fill);border:1.5px solid var(--gd-rim);color:var(--text-inv);
+/* --------------------------------------------------------------- staking */
+.ar-stakes{display:flex;gap:8px;flex-wrap:wrap}
+.ar-stakes button{
+  flex:1 1 0;min-width:64px;padding:11px 8px;border-radius:12px;
+  font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);color:var(--text-inv-soft);
   -webkit-tap-highlight-color:transparent;touch-action:manipulation;
-  transition:transform .16s var(--ease),opacity .2s,border-color .2s,box-shadow .2s;
+  transition:transform .14s var(--ease),border-color .16s,color .16s,opacity .16s;
 }
-.ar-btn:active{transform:scale(.96)}
-.ar-arrow{font-size:22px;line-height:1}
-.ar-side{font-family:var(--font-display);font-weight:800;font-size:17px;letter-spacing:-.01em}
-.ar-count{font-size:11px;color:var(--text-inv-mute)}
-.ar-count b{color:var(--text-inv-soft)}
-.ar-btn.up   .ar-arrow{color:var(--up)}
-.ar-btn.down .ar-arrow{color:var(--down)}
-.ar-btn.up.picked{
-  border-color:var(--up);background:rgba(61,220,132,.14);
-  box-shadow:0 0 0 3px rgba(61,220,132,.16),0 10px 30px -14px rgba(61,220,132,.8);
-}
-.ar-btn.down.picked{
-  border-color:var(--down);background:rgba(255,93,93,.14);
-  box-shadow:0 0 0 3px rgba(255,93,93,.16),0 10px 30px -14px rgba(255,93,93,.8);
-}
-.ar-btn.dimmed{opacity:.4}
+.ar-stakes button:active{transform:scale(.95)}
+.ar-stakes button.on{border-color:var(--lime-400);color:var(--lime-300);background:rgba(168,220,43,.12)}
+.ar-stakes button[disabled]{opacity:.35;pointer-events:none}
 
-/* how the room is leaning */
-.ar-split{height:5px;border-radius:3px;background:rgba(255,93,93,.45);overflow:hidden}
-.ar-split i{
-  display:block;height:100%;background:var(--up);
-  transform-origin:left center;transform:scaleX(.5);
-  transition:transform .5s var(--ease-out);
+.ar-wallet{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ar-you{font-size:12.5px;color:var(--text-inv-mute)}
+.ar-you b{
+  font-family:var(--font-display);font-size:15px;color:var(--text-inv);
+  font-variant-numeric:tabular-nums;
 }
-
-/* people arriving */
-.ar-joins{display:flex;flex-wrap:wrap;gap:6px;min-height:24px}
-.ar-join{
-  padding:4px 9px;border-radius:999px;font-family:var(--font-mono);font-size:10.5px;
-  background:var(--gd-fill-hi);border:1px solid var(--gd-rim);color:var(--text-inv-mute);
-  opacity:0;transform:translate3d(0,8px,0);
-  transition:opacity .3s var(--ease-out),transform .34s var(--ease-out);
+.ar-claim{
+  margin-left:auto;padding:9px 15px;border-radius:999px;font-size:12.5px;font-weight:700;
+  background:var(--gd-fill-hi);border:1px solid var(--gd-rim);color:var(--lime-300);
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  transition:transform .14s var(--ease),opacity .16s;
 }
-.ar-join.in{opacity:1;transform:none}
-.ar-join.up{border-color:rgba(61,220,132,.35);color:var(--up)}
-.ar-join.down{border-color:rgba(255,93,93,.35);color:#ff9b9b}
+.ar-claim:active{transform:scale(.96)}
+.ar-claim[disabled]{opacity:.45;pointer-events:none;color:var(--text-inv-mute)}
 
-.ar-gate{margin:0;font-size:12.5px;color:var(--text-inv-mute);text-align:center}
+/* ------------------------------------------------------------ who is in */
+.ar-players{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.ar-players li{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.ar-players i{flex:none;width:9px;height:9px;border-radius:3px}
+.ar-players code{font-family:var(--font-mono);color:var(--text-inv-soft)}
+.ar-players li.me code{color:var(--lime-300);font-weight:700}
+.ar-players b{
+  margin-left:auto;font-family:var(--font-display);font-size:13.5px;color:var(--text-inv);
+  font-variant-numeric:tabular-nums;
+}
+.ar-players em{font-style:normal;font-size:11px;color:var(--text-inv-mute);width:34px;text-align:right}
+.ar-empty{color:var(--text-inv-mute);font-size:12.5px}
 
-/* ------------------------------------------------------------ your standing */
-/* Four of these across a 390px phone truncates every single value. Two. */
-.ar-you{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-.ar-you div{
-  display:flex;flex-direction:column;gap:1px;min-width:0;
-  padding:10px 12px;border-radius:12px;
+/* ------------------------------------------------------- the round before */
+.ar-last{
+  display:flex;flex-direction:column;gap:8px;
+  padding:13px 15px;border-radius:14px;
   background:var(--gd-fill);border:1px solid var(--gd-rim);
 }
-.ar-you span{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-inv-mute)}
-.ar-you b{
-  font-family:var(--font-display);font-size:16px;letter-spacing:-.02em;color:var(--text-inv);
-  font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-
-/* ------------------------------------------------------------- the history */
-/* The two labels share the first line; the strip gets its own and scrolls,
-   because a dozen fixed-width chips will not shrink to fit a phone and would
-   otherwise just run straight through the label beside them. */
-.ar-strip-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.ar-strip-label{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-inv-mute)}
-.ar-strip-label:last-child{margin-left:auto}
-.ar-strip-label b{color:var(--text-inv-soft);letter-spacing:0}
-.ar-strip{
-  order:3;flex-basis:100%;display:flex;gap:4px;
-  overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
-}
-.ar-strip::-webkit-scrollbar{display:none}
-.ar-strip i{
-  flex:none;width:19px;height:19px;border-radius:6px;display:grid;place-items:center;
-  font-size:9px;font-style:normal;background:rgba(255,255,255,.06);color:var(--text-inv-mute);
-}
-.ar-strip i.u{background:rgba(61,220,132,.18);color:var(--up)}
-.ar-strip i.d{background:rgba(255,93,93,.18);color:#ff9b9b}
+.ar-last-text{margin:0;font-size:13.5px;color:var(--text-inv-soft);line-height:1.5}
+.ar-last-text b{color:var(--lime-300)}
+.ar-robin{margin:0;font-size:13px;font-style:italic;color:var(--text-inv-mute);line-height:1.5}
+.ar-fair{margin:0;display:flex;flex-direction:column;gap:5px}
+.ar-fair div{display:flex;align-items:baseline;gap:8px}
+.ar-fair dt{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text-inv-mute)}
+.ar-fair dd{margin:0 0 0 auto;font-family:var(--font-mono);font-size:11px;color:var(--text-inv-soft)}
 
 .ar-boardwrap{border-radius:13px;background:var(--gd-fill);border:1px solid var(--gd-rim);padding:12px 14px}
 .ar-boardwrap summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--text-inv-soft)}
 .ar-board{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
 .ar-board li{display:flex;align-items:center;gap:9px;font-size:12.5px}
-.ar-board li.me{color:var(--lime-300)}
+.ar-board li.me code{color:var(--lime-300)}
 .ar-board b{flex:none;width:18px;color:var(--text-inv-mute);font-variant-numeric:tabular-nums}
 .ar-board code{font-family:var(--font-mono);color:var(--text-inv-soft)}
-.ar-board li.me code{color:var(--lime-300)}
 .ar-board em{font-style:normal;font-size:10.5px;color:var(--text-inv-mute)}
 .ar-board span{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text-inv)}
-.ar-empty{color:var(--text-inv-mute)}
 
 .ar-note{margin:2px 0 0;font-size:12px;line-height:1.55;color:var(--text-inv-mute)}
 .ar-note.bad{color:#ffc9c9}
 
-/* ---------------------------------------------------------- the payout card */
+/* --------------------------------------------------------- the payout card */
 .ar-win{
-  position:absolute;left:50%;top:38%;z-index:6;pointer-events:none;
+  position:absolute;left:50%;top:34%;z-index:7;pointer-events:none;
   display:flex;flex-direction:column;align-items:center;gap:1px;
-  padding:16px 28px;border-radius:20px;
+  padding:16px 30px;border-radius:20px;
   background:linear-gradient(150deg,rgba(26,34,14,.97),rgba(8,11,5,.97));
-  border:1px solid rgba(61,220,132,.5);
+  border:1px solid rgba(168,220,43,.55);
   box-shadow:0 22px 54px -18px rgba(0,0,0,.95);
   opacity:0;transform:translate3d(-50%,14px,0) scale(.9);
   transition:opacity .3s var(--ease-out),transform .44s var(--ease-out);
 }
 .ar-win.in{opacity:1;transform:translate3d(-50%,0,0) scale(1)}
-.ar-win b{font-family:var(--font-display);font-size:30px;letter-spacing:-.03em;color:var(--up)}
+.ar-win b{font-family:var(--font-display);font-size:32px;letter-spacing:-.03em;color:var(--lime-300)}
 .ar-win span{font-size:10.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--text-inv-mute)}
 
-@media (min-width:560px){
-  .ar-pick{gap:12px}
-  .ar-btn{padding:22px 14px}
-  .ar-you{grid-template-columns:repeat(4,1fr)}
-  .ar-strip{order:0;flex-basis:auto;flex:1;min-width:0}
-  .ar-strip-label:last-child{margin-left:0}
-}
 @media (min-width:700px){
   .arena{padding:24px;gap:16px}
-  .ar-ring{width:118px;height:118px}
-  .ar-clock{font-size:25px}
-  .ar-price{font-size:34px}
+  .ar-stage{max-width:300px}
+  .ar-center b{font-size:36px}
+  .ar-timer b{font-size:25px}
 }
 
 /* ══════════════════════════════════════════════════════════ X / Twitter */

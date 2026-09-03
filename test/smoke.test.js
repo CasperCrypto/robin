@@ -130,8 +130,8 @@ setTimeout(() => {
   check('swap CTA says connect, never install', t('#swapBtn') === 'Connect wallet', t('#swapBtn'));
   check('nav button says Connect', t('#navConnect') === 'Connect', t('#navConnect'));
   check('arena present', !!d.querySelector('#arena'));
-  check('arena has both sides to pick', !!d.querySelector('#arUp') && !!d.querySelector('#arDown'));
-  check('arena shows a round history strip', !!d.querySelector('#arStrip'));
+  check('the wheel is there', !!d.querySelector('#arWheel') && !!d.querySelector('#arArcs'));
+  check('there is something to press', !!d.querySelector('#arThrow') && !!d.querySelector('#arClaim'));
   check('arena confetti starts hidden', d.querySelector('#arBurst')?.hasAttribute('hidden'));
   check('only one AI feature ships',
     !d.querySelector('#aiLog') && !d.querySelector('#alphaOut') && !d.querySelector('#memeOut'));

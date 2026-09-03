@@ -67,55 +67,49 @@
     unreachable: [], scannedAt: Math.floor(Date.now() / 1000)
   };
 
-  /* A sample arena, for a preview that cannot reach PHP. Built around the real
-     clock so the countdown genuinely counts down and the round really does turn
-     over while you watch it. */
+  /* A sample jackpot, for a preview that cannot reach PHP. Built around the
+     real clock so the countdown genuinely counts down. */
   function sampleArena() {
-    var now = Math.floor(Date.now() / 1000), live = Math.floor(now / 300);
-    var px = PAIR.priceUsd ? parseFloat(PAIR.priceUsd) : 0.00007012;
-    var wallets = ['0x8f2a1b4c5d6e7f8091a2b3c4d5e6f70819a2b3c4',
-                   '0x41d9c0aabbccddeeff00112233445566778899aa',
-                   '0xbb70e2001122334455667788990011223344556f',
-                   '0x0d34af99887766554433221100ffeeddccbbaa99',
-                   '0x9c1e58123456789abcdef0123456789abcdef012'];
-    var recent = [];
-    for (var i = 1; i <= 12; i++) {
-      var up = [1, 1, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0][i - 1] === 1;
-      recent.push({
-        id: live - i, status: i === 5 ? 'void' : 'settled',
-        lockPrice: px, settlePrice: up ? px * 1.01 : px * 0.99,
-        robinSide: up ? 'UP' : 'DOWN', robinWon: i % 3 !== 0, up: 6 + i, down: 4 + (i % 5),
-        joins: []
-      });
+    var now = Math.floor(Date.now() / 1000), live = Math.floor(now / 90);
+    var W = ['0x8f2a1b4c5d6e7f8091a2b3c4d5e6f70819a2b3c4',
+             '0x41d9c0aabbccddeeff00112233445566778899aa',
+             '0xbb70e2001122334455667788990011223344556f',
+             '0x0d34af99887766554433221100ffeeddccbbaa99'];
+    var entries = [{ addr: W[0], stake: 2000 }, { addr: W[1], stake: 1200 },
+                   { addr: W[2], stake: 700 },  { addr: W[3], stake: 400 }];
+    var pot = 4300;
+    var prev = {
+      id: live - 1, startsAt: (live - 1) * 90, closesAt: (live - 1) * 90 + 65, endsAt: live * 90,
+      phase: 'settled', pot: 3100, winner: W[1], ticket: 2210,
+      seedHash: 'd41d8cd98f00b204e9800998ecf8427e11223344556677889900aabbccddeeff',
+      seed: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+      entries: [{ addr: W[0], stake: 1500 }, { addr: W[1], stake: 1000 }, { addr: W[2], stake: 600 }],
+      reaction: 'The one who staked least walks off with the lot. Typical.'
+    };
+    var recent = [prev];
+    for (var i = 2; i <= 8; i++) {
+      recent.push({ id: live - i, phase: i === 4 ? 'void' : 'settled', pot: 1200 + i * 300,
+                    winner: W[i % 4], ticket: 100 * i, entries: [], seed: null, seedHash: null });
     }
     return {
-      now: now, roundSec: 300, price: px,
-      live: { id: live, startsAt: live * 300, endsAt: (live + 1) * 300, status: 'live',
-              lockPrice: px * 0.9976, settlePrice: null, robinSide: 'UP',
-              up: 14, down: 9, joins: [] },
-      open: { id: live + 1, startsAt: (live + 1) * 300, endsAt: (live + 2) * 300, status: 'open',
-              lockPrice: null, settlePrice: null,
-              robinSide: 'DOWN',
-              robinNote: 'Three buys in a row and no follow-through. I fade that every time.',
-              up: 5, down: 8,
-              joins: wallets.map(function (w, i) {
-                return { addr: w, side: i % 3 === 0 ? 'UP' : 'DOWN', tier: 'Archer' };
-              }) },
-      yourLive: { side: 'UP', tier: 'Outlaw', mult: 2, won: null, points: 0 },
-      yourOpen: null,
-      you: { points: 1450, wins: 9, played: 14, streak: 2, best: 5, tier: 'Outlaw', last: null },
-      robin: { wins: 14, rounds: 23 },
+      now: now, roundSec: 90, entrySec: 65, minStake: 50,
+      live: { id: live, startsAt: live * 90, closesAt: live * 90 + 65, endsAt: (live + 1) * 90,
+              phase: 'entry', pot: pot, entries: entries, winner: null, ticket: null,
+              seedHash: 'a3bf4f1b2b0b822cd15d6c15b0f00a08d41d8cd98f00b204e9800998ecf8427e',
+              seed: null, reaction: null },
+      last: prev,
+      you: { points: 2600, staked: 400, won: 3100, wins: 3, rounds: 11, biggest: 3100,
+             tier: 'Outlaw', claimIn: 0 },
       top: [
-        { addr: '0x8f2a1b4c5d6e7f8091a2b3c4d5e6f70819a2b3c4', points: 3200, wins: 21, played: 30, streak: 4, best: 7, tier: 'Sheriff' },
-        { addr: '0x41d9c0aabbccddeeff00112233445566778899aa', points: 2150, wins: 15, played: 24, streak: 0, best: 5, tier: 'Outlaw' },
-        { addr: '0xbb70e2001122334455667788990011223344556f', points: 1450, wins: 9,  played: 14, streak: 2, best: 5, tier: 'Outlaw' },
-        { addr: '0x0d34af99887766554433221100ffeeddccbbaa99', points: 900,  wins: 6,  played: 13, streak: 1, best: 3, tier: 'Archer' },
-        { addr: '0x9c1e58123456789abcdef0123456789abcdef012', points: 400,  wins: 3,  played: 9,  streak: 0, best: 2, tier: 'Scout' }
+        { addr: W[0], points: 9400, won: 12800, wins: 6, rounds: 21, biggest: 5200, tier: 'Sheriff' },
+        { addr: W[1], points: 5200, won: 7100,  wins: 4, rounds: 18, biggest: 3100, tier: 'Outlaw' },
+        { addr: W[3], points: 2600, won: 3100,  wins: 3, rounds: 11, biggest: 3100, tier: 'Outlaw' },
+        { addr: W[2], points: 900,  won: 1400,  wins: 1, rounds: 9,  biggest: 1400, tier: 'Archer' }
       ],
       recent: recent,
       tiers: [
-        { name: 'Sheriff', min: 5000000, mult: 3 }, { name: 'Outlaw', min: 1000000, mult: 2 },
-        { name: 'Archer', min: 250000, mult: 1.5 }, { name: 'Scout', min: 50000, mult: 1 }
+        { name: 'Sheriff', min: 5000000, daily: 10000 }, { name: 'Outlaw', min: 1000000, daily: 4000 },
+        { name: 'Archer', min: 250000, daily: 1500 }, { name: 'Scout', min: 50000, daily: 500 }
       ]
     };
   }
@@ -187,7 +181,7 @@
     if (u.indexOf('api/arena') > -1) {
       // Joining a round is never faked: a sample "you're in" for an entry that
       // was never recorded would be a straight lie to the player.
-      if (u.indexOf('a=join') > -1) return real ? real(url, opts) : Promise.reject(new Error('blocked'));
+      if (/a=(join|claim)/.test(u)) return real ? real(url, opts) : Promise.reject(new Error('blocked'));
       return passthroughOr(url, opts, function () { return J(sampleArena(), 300); });
     }
 

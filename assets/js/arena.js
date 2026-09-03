@@ -1,17 +1,19 @@
 /* ============================================================================
-   arena.js — Robin Arena.
+   arena.js — Robin Arena: the jackpot wheel.
 
-   Five-minute rounds on the $ROBIN price. While one runs, entry is open for
-   the next, so there is always something to watch and something to pick.
+   Everyone throws points into one pot. Your slice of the wheel is your share
+   of the pot. When the round closes the wheel spins and one entry takes
+   everything.
 
-   The countdown runs locally off a clock offset measured against the server,
-   rather than off this device's clock — phones are routinely a few seconds
-   out, and a timer that disagrees with the round it is counting down makes the
-   whole thing feel broken.
+   Two things worth knowing about how this is drawn.
 
-   Everything that moves here is transform or opacity. The one exception is the
-   countdown ring, which steps its dash offset once a second on a single small
-   SVG, and that is the whole animation budget for this section.
+   The wheel lands on the *published ticket*, not on the middle of the winner's
+   slice. The server picks a number in [0, pot) from a seed it committed to
+   before anyone entered; that number is a position on the wheel, and that is
+   the position the pointer stops at. So what you watch is the actual result
+   being revealed, not an animation of a result decided elsewhere.
+
+   The spin is a transform on one group, and nothing else moves while it runs.
    ========================================================================== */
 (function () {
   'use strict';
@@ -21,170 +23,256 @@
 
   var cfg = C.arena || {};
   var ENDPOINT = cfg.endpoint || 'api/arena.php';
-  var POLL_MS  = cfg.pollMs || 9000;
+  var POLL_IDLE = cfg.pollMs || 6000;
+  var POLL_SPIN = 1500;                       // while a result is due
+  var SPIN_MS = 4600;
 
   var $ = function (id) { return document.getElementById(id); };
-
   var els = {
-    ring: $('arRing'), clock: $('arClock'), roundNo: $('arRound'),
-    price: $('arPrice'), delta: $('arDelta'), lock: $('arLock'),
-    robin: $('arRobin'), robinSide: $('arRobinSide'), robinNote: $('arRobinNote'),
-    robinRec: $('arRobinRec'),
-    up: $('arUp'), down: $('arDown'), upN: $('arUpN'), downN: $('arDownN'),
-    split: $('arSplit'), joins: $('arJoins'),
-    you: $('arYou'), youPts: $('arYouPts'), youRec: $('arYouRec'), youStreak: $('arYouStreak'),
-    tier: $('arTier'), gate: $('arGate'), board: $('arBoard'), strip: $('arStrip'),
-    note: $('arNote'), burst: $('arBurst'),
+    round: $('arRound'), clock: $('arClock'), phase: $('arPhase'),
+    wheel: $('arWheel'), arcs: $('arArcs'), pot: $('arPot'), potLabel: $('arPotLabel'),
+    players: $('arPlayers'), stakes: $('arStakes'), throwIn: $('arThrow'),
+    you: $('arYou'), youPts: $('arYouPts'), claim: $('arClaim'),
+    last: $('arLast'), lastText: $('arLastText'), robin: $('arRobin'),
+    fair: $('arFair'), fairHash: $('arFairHash'), fairSeed: $('arFairSeed'), fairTicket: $('arFairTicket'),
+    board: $('arBoard'), note: $('arNote'), burst: $('arBurst'),
   };
 
-  var S = {
-    offset: 0,          // serverNow - Date.now()/1000
-    state: null,
-    myPick: null,       // side chosen for the open round, before the server confirms
-    celebrated: null,   // round id of the last win we made a fuss about
-    busy: false,
-  };
+  /* Slice colours come from position in the round, not from a hash of the
+     address: hashing put two near-identical oranges next to each other, and on
+     a wheel the one thing a colour has to do is differ from its neighbour.
+     Entry order is fixed by the server, so a slice still keeps its colour for
+     the whole round. */
+  var PALETTE = ['#a8dc2b', '#5ec8f0', '#ffd447', '#ff6b9d', '#3ddc84',
+                 '#b78cf0', '#ff8f6b', '#c9f05e', '#f0a35e', '#8bc016'];
+  var slot = {};
+  function colorFor(a) { return PALETTE[(slot[a] || 0) % PALETTE.length]; }
+  function assignColors(entries) {
+    slot = {};
+    entries.forEach(function (e, i) { slot[e.addr] = i; });
+  }
+
+  var S = { offset: 0, state: null, stake: 500, spun: {}, timer: null, spinning: false };
 
   function srvNow() { return Date.now() / 1000 + S.offset; }
   function addr() { return (RB.wallet && RB.wallet.state && RB.wallet.state.account) || null; }
+  function esc(x) { return RB.esc(String(x)); }
 
   /* ------------------------------------------------------------------ poll */
   function pull() {
     var a = addr();
-    var url = ENDPOINT + '?a=state' + (a ? '&addr=' + encodeURIComponent(a) : '');
-    return fetch(url, { headers: { Accept: 'application/json' } })
+    return fetch(ENDPOINT + '?a=state' + (a ? '&addr=' + encodeURIComponent(a) : ''),
+                 { headers: { Accept: 'application/json' } })
       .then(function (r) { return r.json(); })
       .then(function (j) {
         if (j.error) throw new Error(j.error);
         S.offset = j.now - Date.now() / 1000;
-        var prevOpen = S.state && S.state.open.id;
         S.state = j;
-        if (prevOpen && j.open.id !== prevOpen) S.myPick = null;   // new round, fresh slate
         render();
-        celebrate();
+        schedule();
       })
-      .catch(function (e) { fail(e.message); });
+      .catch(function (e) { fail(e.message); schedule(); });
+  }
+
+  /* Poll hard only while a result is actually due — the rest of the time a
+     round is just a countdown this page can run on its own. */
+  function schedule() {
+    clearTimeout(S.timer);
+    var s = S.state, wait = POLL_IDLE;
+    if (s) {
+      var t = srvNow();
+      if (t >= s.live.closesAt) wait = POLL_SPIN;
+      else wait = Math.min(POLL_IDLE, Math.max(900, (s.live.closesAt - t) * 1000));
+    }
+    S.timer = setTimeout(pull, wait);
   }
 
   function fail(msg) {
     els.note.textContent = msg || 'The arena is not reachable right now.';
     els.note.classList.add('bad');
   }
+  function say(msg) {
+    els.note.textContent = msg;
+    els.note.classList.remove('bad');
+  }
 
   /* ---------------------------------------------------------------- render */
-  var lastPrice = null;
-
   function render() {
     var s = S.state;
     if (!s) return;
-    els.note.classList.remove('bad');
 
-    /* the live round */
-    els.roundNo.textContent = '#' + s.live.id;
-    if (s.price != null) {
-      els.price.textContent = RB.usd(s.price);
-      if (lastPrice !== null && s.price !== lastPrice) {
-        flash(els.price, s.price > lastPrice ? 'up' : 'down');
-      }
-      lastPrice = s.price;
-    }
-
-    var lock = s.live.lockPrice;
-    if (lock && s.price) {
-      var pct = (s.price - lock) / lock * 100;
-      els.delta.textContent = (pct >= 0 ? '▲ +' : '▼ ') + pct.toFixed(2) + '%';
-      els.delta.className = 'ar-delta ' + (pct >= 0 ? 'up' : 'down');
-      els.lock.textContent = 'locked at ' + RB.usd(lock);
-      els.lock.hidden = false;
-    } else {
-      els.delta.textContent = 'waiting for the lock price';
-      els.delta.className = 'ar-delta';
-      els.lock.hidden = true;
-    }
-
-    /* Robin */
-    var rs = s.open.robinSide;
-    if (rs) {
-      els.robin.hidden = false;
-      els.robinSide.textContent = rs === 'UP' ? '▲ UP' : '▼ DOWN';
-      els.robinSide.className = 'ar-robin-side ' + rs.toLowerCase();
-      els.robinNote.textContent = s.open.robinNote || '';
-    } else {
-      els.robin.hidden = true;
-    }
-    els.robinRec.textContent = s.robin.rounds
-      ? s.robin.wins + '/' + s.robin.rounds + ' (' + Math.round(s.robin.wins / s.robin.rounds * 100) + '%)'
-      : 'no record yet';
-
-    /* the open round */
-    var mine = (s.yourOpen && s.yourOpen.side) || S.myPick;
-    els.up.classList.toggle('picked', mine === 'UP');
-    els.down.classList.toggle('picked', mine === 'DOWN');
-    els.up.classList.toggle('dimmed', !!mine && mine !== 'UP');
-    els.down.classList.toggle('dimmed', !!mine && mine !== 'DOWN');
-    els.upN.textContent = s.open.up;
-    els.downN.textContent = s.open.down;
-
-    var total = s.open.up + s.open.down;
-    els.split.style.transform = 'scaleX(' + (total ? s.open.up / total : 0.5) + ')';
-
-    renderJoins(s.open.joins || []);
-
-    /* you */
-    if (s.you) {
-      els.you.hidden = false;
-      els.youPts.textContent = RB.num(s.you.points);
-      els.youRec.textContent = s.you.wins + 'W · ' + (s.you.played - s.you.wins) + 'L';
-      els.youStreak.textContent = s.you.streak > 1 ? '🔥 ' + s.you.streak : '';
-      els.tier.textContent = s.you.tier || '';
-      els.tier.hidden = !s.you.tier;
-    } else {
-      els.you.hidden = true;
-      els.tier.hidden = true;
-    }
-
-    els.gate.hidden = !!addr();
-    renderStrip(s.recent || []);
+    els.round.textContent = '#' + s.live.id;
+    // A poll lands every second and a half while a result is due, and swapping
+    // the slices out from under a spin in progress would be the one moment
+    // this thing must not flicker.
+    if (!S.spinning) drawWheel(s.live);
+    renderPlayers(s.live);
+    renderStakes();
+    renderYou();
+    renderLast(s.last);
     renderBoard(s.top || []);
-    tickClock();
+    tick();
   }
 
-  function flash(el, dir) {
-    el.classList.remove('f-up', 'f-down');
-    void el.offsetWidth;                      // restart the animation
-    el.classList.add('f-' + dir);
-  }
+  /* -------------------------------------------------------------- the wheel */
+  /* A donut drawn as one circle per slice, each with a dash gap sized to its
+     share. Cheap to redraw, and the whole thing spins as a single transform. */
+  var R = 52, CIRC = 2 * Math.PI * R;
 
-  /* Joins arrive as a set, not a stream, so only draw the ones we have not
-     drawn before — otherwise every poll replays the same six arrivals. */
-  var seenJoins = {};
-  function renderJoins(joins) {
-    joins.slice().reverse().forEach(function (j) {
-      var key = S.state.open.id + ':' + j.addr;
-      if (seenJoins[key]) return;
-      seenJoins[key] = true;
-      var chip = document.createElement('span');
-      chip.className = 'ar-join ' + j.side.toLowerCase();
-      chip.textContent = RB.shortAddr(j.addr) + ' ' + (j.side === 'UP' ? '▲' : '▼');
-      els.joins.appendChild(chip);
-      requestAnimationFrame(function () {
-        requestAnimationFrame(function () { chip.classList.add('in'); });
-      });
-      setTimeout(function () {
-        chip.classList.remove('in');
-        setTimeout(function () { chip.remove(); }, 400);
-      }, 4200);
-    });
-  }
+  function drawWheel(round, keepRotation) {
+    if (!keepRotation) {
+      els.wheel.style.transition = 'none';
+      els.wheel.style.transform = 'rotate(0deg)';
+    }
+    var entries = round.entries || [];
+    var pot = round.pot || 0;
+    els.pot.textContent = pot ? RB.num(pot) : '—';
+    els.potLabel.textContent = pot ? 'in the pot' : 'nothing staked yet';
 
-  function renderStrip(recent) {
-    els.strip.innerHTML = recent.map(function (r) {
-      if (r.status === 'void')    return '<i class="v" title="Round ' + r.id + ': void">—</i>';
-      if (r.status !== 'settled') return '<i class="p" title="Round ' + r.id + '">·</i>';
-      var up = r.settlePrice > r.lockPrice;
-      return '<i class="' + (up ? 'u' : 'd') + '" title="Round ' + r.id + ': ' +
-             (up ? 'up' : 'down') + '">' + (up ? '▲' : '▼') + '</i>';
+    if (!entries.length) {
+      els.arcs.innerHTML = '<circle class="ar-arc-empty" cx="60" cy="60" r="52"></circle>';
+      return;
+    }
+    assignColors(entries);
+    var acc = 0;
+    els.arcs.innerHTML = entries.map(function (e) {
+      var frac = e.stake / pot, len = CIRC * frac;
+      var c = '<circle cx="60" cy="60" r="' + R + '" stroke="' + colorFor(e.addr) + '"' +
+              ' stroke-dasharray="' + len.toFixed(3) + ' ' + (CIRC - len).toFixed(3) + '"' +
+              ' stroke-dashoffset="' + (-CIRC * acc).toFixed(3) + '"></circle>';
+      acc += frac;
+      return c;
     }).join('');
+  }
+
+  /* Spin so the pointer lands on the ticket the server published. */
+  function spinTo(round) {
+    if (!round || round.ticket == null || !round.pot) return;
+    var frac = round.ticket / round.pot;
+    var turns = 6;
+    var deg = turns * 360 + (360 - frac * 360);
+
+    els.wheel.style.transition = 'none';
+    els.wheel.style.transform = 'rotate(0deg)';
+    void els.wheel.offsetWidth;
+    els.wheel.style.transition = 'transform ' + SPIN_MS + 'ms cubic-bezier(.14,.72,.14,1)';
+    els.wheel.style.transform = 'rotate(' + deg + 'deg)';
+    root.classList.add('spinning');
+    S.spinning = true;
+
+    // Hold the result on the wheel for a moment after it stops, then hand the
+    // wheel back to the round now taking entries.
+    setTimeout(function () { root.classList.remove('spinning'); }, SPIN_MS + 60);
+    setTimeout(function () {
+      S.spinning = false;
+      if (S.state) drawWheel(S.state.live);
+    }, SPIN_MS + 2600);
+  }
+
+  /* Runs after drawWheel, so the dots match the slices it just assigned. */
+  function renderPlayers(round) {
+    var entries = round.entries || [];
+    var me = (addr() || '').toLowerCase();
+    if (!entries.length) {
+      els.players.innerHTML = '<li class="ar-empty">Nobody has thrown in yet. Go on.</li>';
+      return;
+    }
+    els.players.innerHTML = entries.map(function (e) {
+      var pct = Math.round(e.stake / round.pot * 100);
+      return '<li' + (e.addr === me ? ' class="me"' : '') + '>' +
+        '<i style="background:' + colorFor(e.addr) + '"></i>' +
+        '<code>' + esc(e.addr === me ? 'you' : RB.shortAddr(e.addr)) + '</code>' +
+        '<b>' + esc(RB.num(e.stake)) + '</b><em>' + pct + '%</em></li>';
+    }).join('');
+  }
+
+  var PRESETS = [100, 500, 1000];
+  function renderStakes() {
+    var pts = (S.state.you && S.state.you.points) || 0;
+    var opts = PRESETS.filter(function (p) { return p >= S.state.minStake; });
+    els.stakes.innerHTML = opts.map(function (p) {
+      return '<button type="button" data-stake="' + p + '"' +
+             (S.stake === p ? ' class="on"' : '') + (p > pts ? ' disabled' : '') + '>' +
+             RB.num(p) + '</button>';
+    }).join('') +
+      '<button type="button" data-stake="all"' + (S.stake === pts && pts ? ' class="on"' : '') +
+      (pts < S.state.minStake ? ' disabled' : '') + '>All in</button>';
+    if (S.stake > pts && pts >= S.state.minStake) S.stake = pts;   // keep the choice affordable
+
+    /* The button is only ever dead when the round is genuinely shut. Disabling
+       it for someone with no wallet — which is everyone on their first visit —
+       kills the one control that would have got them started. */
+    var open = srvNow() < S.state.live.closesAt;
+    els.throwIn.disabled = !open;
+    els.throwIn.textContent =
+      !open                        ? 'Round closed' :
+      !addr()                      ? 'Connect a wallet' :
+      pts < S.state.minStake       ? 'Claim your points first' :
+                                     'Throw in ' + RB.num(Math.min(S.stake, pts));
+  }
+
+  function renderYou() {
+    var y = S.state.you;
+    if (!y) { els.you.hidden = true; els.claim.textContent = 'Claim daily points'; return; }
+    els.you.hidden = false;
+    els.youPts.textContent = RB.num(y.points);
+    els.claim.disabled = y.claimIn > 0;
+
+    // Name the number when we know it — "Claim 4,000" tells you what the tier
+    // is worth, and fits on one line where the generic label did not.
+    var tier = (S.state.tiers || []).filter(function (t) { return t.name === y.tier; })[0];
+    els.claim.textContent = y.claimIn > 0
+      ? 'Next in ' + Math.ceil(y.claimIn / 3600) + 'h'
+      : 'Claim ' + (tier ? RB.num(tier.daily) : 'daily points');
+  }
+
+  function renderLast(last) {
+    if (!last || last.phase === 'entry' || last.phase === 'pending') { els.last.hidden = true; return; }
+    els.last.hidden = false;
+
+    if (last.phase === 'void') {
+      els.lastText.textContent = 'Round #' + last.id + ' had only one player, so the stake went back.';
+      els.fair.hidden = true;
+      els.robin.hidden = true;
+      return;
+    }
+    var me = (addr() || '').toLowerCase();
+    var mine = last.winner === me;
+    els.lastText.innerHTML = 'Round #' + last.id + ' — <b>' +
+      esc(mine ? 'you' : RB.shortAddr(last.winner)) + '</b> took ' +
+      '<b>' + esc(RB.num(last.pot)) + '</b> points.';
+
+    els.fair.hidden = false;
+    els.fairHash.textContent = (last.seedHash || '').slice(0, 16) + '…';
+    els.fairSeed.textContent = (last.seed || '').slice(0, 16) + '…';
+    els.fairTicket.textContent = RB.num(last.ticket) + ' of ' + RB.num(last.pot);
+
+    if (last.reaction) { els.robin.hidden = false; els.robin.textContent = '“' + last.reaction + '”'; }
+    else { els.robin.hidden = true; askRobin(last.id); }
+
+    // Spin once per round, when we first learn how it went.
+    if (!S.spun[last.id]) {
+      S.spun[last.id] = true;
+      drawWheel(last);            // the finished round is what the wheel shows
+      spinTo(last);
+      if (mine) setTimeout(function () { win(last.pot); }, SPIN_MS - 250);
+    }
+  }
+
+  var asked = {};
+  function askRobin(id) {
+    if (asked[id]) return;
+    asked[id] = true;
+    fetch(ENDPOINT + '?a=react&round=' + id)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.reaction) return;
+        if (S.state && S.state.last && S.state.last.id === id) {
+          els.robin.hidden = false;
+          els.robin.textContent = '“' + j.reaction + '”';
+        }
+      })
+      .catch(function () {});
   }
 
   function renderBoard(top) {
@@ -195,60 +283,44 @@
     var me = (addr() || '').toLowerCase();
     els.board.innerHTML = top.map(function (p, i) {
       return '<li' + (p.addr === me ? ' class="me"' : '') + '>' +
-        '<b>' + (i + 1) + '</b>' +
-        '<code>' + RB.esc(RB.shortAddr(p.addr)) + '</code>' +
-        '<em>' + RB.esc(p.tier || '') + '</em>' +
-        '<span>' + (p.best > 1 ? '🔥' + p.best + ' ' : '') + RB.num(p.points) + '</span>' +
-      '</li>';
+        '<b>' + (i + 1) + '</b><code>' + esc(RB.shortAddr(p.addr)) + '</code>' +
+        '<em>' + esc(p.tier || '') + '</em>' +
+        '<span>' + esc(RB.num(p.points)) + '</span></li>';
     }).join('');
   }
 
-  /* ----------------------------------------------------------- the clock */
-  var RING = 2 * Math.PI * 52;                // matches the SVG radius
+  /* ---------------------------------------------------------------- the clock */
   var lastShown = null;
-
-  function tickClock() {
+  function tick() {
     var s = S.state;
     if (!s) return;
-    var left = Math.max(0, s.live.endsAt - srvNow());
-    var frac = Math.min(1, Math.max(0, left / s.roundSec));
-
+    var t = srvNow();
+    var closing = t < s.live.closesAt;
+    var left = Math.max(0, (closing ? s.live.closesAt : s.live.endsAt) - t);
     var mm = Math.floor(left / 60), ss = Math.floor(left % 60);
     var txt = mm + ':' + (ss < 10 ? '0' : '') + ss;
-    if (txt !== lastShown) {
-      els.clock.textContent = txt;
-      lastShown = txt;
-      els.ring.style.strokeDashoffset = String(RING * (1 - frac));
-      root.classList.toggle('closing', left <= 10);
-    }
-    if (left <= 0.2) setTimeout(pull, 900);   // the round just turned over
+    if (txt === lastShown) return;
+    lastShown = txt;
+    els.clock.textContent = txt;
+    els.phase.textContent = closing ? 'until the wheel spins' : 'spinning';
+    root.classList.toggle('closing', closing && left <= 10);
+    if (!closing) renderStakes();
   }
 
-  /* ------------------------------------------------------------ the payout */
-  function celebrate() {
-    var last = S.state.you && S.state.you.last;
-    if (!last || !last.won) return;
-    if (S.celebrated === last.round) return;
-    if (S.celebrated === null) { S.celebrated = last.round; return; }  // don't replay history on arrival
-    S.celebrated = last.round;
-    burst(last.points);
-  }
-
-  /* A short particle burst on a canvas. Cheap, self-contained, and it stops
-     dead once the last particle is gone — no idle animation loop. */
-  function burst(points) {
+  /* ------------------------------------------------------------- the payout */
+  function win(pot) {
     root.classList.add('won');
     setTimeout(function () { root.classList.remove('won'); }, 1400);
 
-    var win = document.createElement('div');
-    win.className = 'ar-win';
-    win.innerHTML = '<b>+' + RB.num(points) + '</b><span>points</span>';
-    root.appendChild(win);
-    requestAnimationFrame(function () { win.classList.add('in'); });
+    var card = document.createElement('div');
+    card.className = 'ar-win';
+    card.innerHTML = '<b>+' + RB.num(pot) + '</b><span>points</span>';
+    root.appendChild(card);
+    requestAnimationFrame(function () { card.classList.add('in'); });
     setTimeout(function () {
-      win.classList.remove('in');
-      setTimeout(function () { win.remove(); }, 400);
-    }, 2200);
+      card.classList.remove('in');
+      setTimeout(function () { card.remove(); }, 400);
+    }, 2400);
 
     var cv = els.burst, ctx = cv.getContext('2d');
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -256,18 +328,12 @@
     cv.width = w * dpr; cv.height = h * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    var colors = ['#a8dc2b', '#c9f05e', '#ffd447', '#3ddc84', '#ffffff'];
     var bits = [];
-    for (var i = 0; i < 48; i++) {
-      var a = Math.random() * Math.PI * 2, sp = 2.5 + Math.random() * 5.5;
-      bits.push({
-        x: w / 2, y: h * 0.42,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3,
-        r: 2 + Math.random() * 3, life: 1,
-        c: colors[(Math.random() * colors.length) | 0],
-      });
+    for (var i = 0; i < 56; i++) {
+      var a = Math.random() * Math.PI * 2, sp = 2.5 + Math.random() * 6;
+      bits.push({ x: w / 2, y: h * 0.38, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3,
+                  r: 2 + Math.random() * 3, life: 1, c: PALETTE[(Math.random() * PALETTE.length) | 0] });
     }
-
     cv.hidden = false;
     (function frame() {
       ctx.clearRect(0, 0, w, h);
@@ -276,65 +342,77 @@
         var b = bits[i];
         if (b.life <= 0) continue;
         alive++;
-        b.vy += 0.22;                       // gravity
-        b.x += b.vx; b.y += b.vy; b.life -= 0.016;
+        b.vy += 0.22; b.x += b.vx; b.y += b.vy; b.life -= 0.016;
         ctx.globalAlpha = Math.max(0, b.life);
         ctx.fillStyle = b.c;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, 6.283);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.283); ctx.fill();
       }
       if (alive) requestAnimationFrame(frame);
       else { ctx.clearRect(0, 0, w, h); cv.hidden = true; }
     })();
   }
 
-  /* ---------------------------------------------------------------- picking */
-  function pick(side) {
-    if (S.busy) return;
-    var a = addr();
-    if (!a) {
-      // No wallet yet: open the picker rather than refusing. Picking a side is
-      // the moment someone decided to play, so that is the moment to ask.
-      if (RB.wallet && RB.wallet.openPicker) RB.wallet.openPicker();
-      return;
-    }
-    S.busy = true;
-    S.myPick = side;                          // show it immediately; confirm below
-    render();
+  /* ----------------------------------------------------------------- actions */
+  function needWallet() {
+    if (addr()) return false;
+    if (RB.wallet && RB.wallet.openPicker) RB.wallet.openPicker();
+    return true;
+  }
 
-    fetch(ENDPOINT + '?a=join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address: a, side: side }),
+  els.stakes.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-stake]');
+    if (!b) return;
+    var pts = (S.state.you && S.state.you.points) || 0;
+    S.stake = b.dataset.stake === 'all' ? pts : parseInt(b.dataset.stake, 10);
+    renderStakes();
+  });
+
+  els.claim.addEventListener('click', function () {
+    if (needWallet()) return;
+    els.claim.disabled = true;
+    fetch(ENDPOINT + '?a=claim', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: addr() }),
     })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
-        S.busy = false;
-        if (!res.ok) { S.myPick = null; render(); return fail(res.j.error); }
-        els.note.textContent = "You're in round #" + res.j.round + " as " + res.j.tier +
-                               ' (×' + res.j.mult + ' points).';
+        if (!res.ok) { els.claim.disabled = false; return fail(res.j.error); }
+        say('Claimed ' + RB.num(res.j.claimed) + ' points as ' + res.j.tier + '.');
         return pull();
       })
-      .catch(function () { S.busy = false; S.myPick = null; render(); fail(); });
-  }
+      .catch(function () { els.claim.disabled = false; fail(); });
+  });
 
-  els.up.addEventListener('click', function () { pick('UP'); });
-  els.down.addEventListener('click', function () { pick('DOWN'); });
+  els.throwIn.addEventListener('click', function () {
+    if (needWallet()) return;
+    var pts = (S.state.you && S.state.you.points) || 0;
+    // Nothing to stake yet: send them where they actually need to go.
+    if (pts < S.state.minStake) { els.claim.click(); return; }
+    var stake = Math.min(S.stake, pts);
+    els.throwIn.disabled = true;
+    fetch(ENDPOINT + '?a=join', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address: addr(), stake: stake }),
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok) { els.throwIn.disabled = false; return fail(res.j.error); }
+        say("You're in round #" + res.j.round + ' for ' + RB.num(res.j.stake) + ' points.');
+        return pull();
+      })
+      .catch(function () { els.throwIn.disabled = false; fail(); });
+  });
 
-  /* ----------------------------------------------------------------- start */
+  /* ------------------------------------------------------------------ start */
   pull();
-  setInterval(pull, POLL_MS);
-  setInterval(tickClock, 250);
+  setInterval(tick, 250);
 
-  // The wallet emits on every internal change, including mid-connect. Only a
-  // different account is worth re-reading the board for.
   var lastAccount = addr();
   if (RB.wallet && RB.wallet.onChange) {
     RB.wallet.onChange(function (st) {
       if (st.account === lastAccount) return;
       lastAccount = st.account;
-      S.celebrated = null;                  // a different player, a different history
+      S.spun = {};
       pull();
     });
   }

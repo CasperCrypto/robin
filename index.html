@@ -320,75 +320,51 @@
   <div class="wrap">
     <div class="sec-head center rv">
       <span class="eyebrow">Robin Arena</span>
-      <h2 class="sec-title">Five minutes. Up or down.</h2>
-      <p class="sec-sub">Call the next five minutes of $ROBIN and everyone who got it right
-        moves up the board. Robin calls every round too — his record is right there, and
-        beating it is the whole point. Hold $ROBIN to play; you never deposit anything.</p>
+      <h2 class="sec-title">Everyone throws in. One walks away with it.</h2>
+      <p class="sec-sub">Hold $ROBIN, claim points every day, and throw them into the pot.
+        Your slice of the wheel is your share of the pot. Every round is provably fair —
+        the seed is published before you play and revealed after, so you can check it yourself.</p>
     </div>
 
     <div class="arena lg lg-d rv" id="arena">
       <canvas class="ar-burst" id="arBurst" hidden aria-hidden="true"></canvas>
 
-      <!-- the round that is running -->
-      <div class="ar-live">
-        <div class="ar-ring">
-          <svg viewBox="0 0 120 120" aria-hidden="true">
-            <circle class="ar-ring-bg" cx="60" cy="60" r="52"></circle>
-            <circle class="ar-ring-fg" id="arRing" cx="60" cy="60" r="52"></circle>
-          </svg>
-          <span class="ar-clock" id="arClock">–:––</span>
-        </div>
-        <div class="ar-now">
-          <span class="ar-round" id="arRound">#—</span>
-          <span class="ar-price" id="arPrice">—</span>
-          <span class="ar-delta" id="arDelta">waiting for the lock price</span>
-          <span class="ar-lock" id="arLock" hidden></span>
-        </div>
+      <div class="ar-top">
+        <span class="ar-round" id="arRound">#—</span>
+        <span class="ar-timer"><b id="arClock">–:––</b> <em id="arPhase">until the wheel spins</em></span>
       </div>
 
-      <!-- Robin's call for the round taking entries -->
-      <div class="ar-robin" id="arRobin" hidden>
-        <picture>
-          <source srcset="assets/img/robin-logo-128.webp" type="image/webp">
-          <img src="assets/img/robin-logo-128.png" width="44" height="44" alt="" loading="lazy" decoding="async">
-        </picture>
-        <div>
-          <span class="ar-robin-head">Robin calls it
-            <b class="ar-robin-side" id="arRobinSide"></b></span>
-          <span class="ar-robin-note" id="arRobinNote"></span>
+      <div class="ar-stage">
+        <span class="ar-pointer" aria-hidden="true"></span>
+        <svg class="ar-wheelbox" viewBox="0 0 120 120" aria-hidden="true">
+          <g class="ar-wheel" id="arWheel">
+            <g id="arArcs"><circle class="ar-arc-empty" cx="60" cy="60" r="52"></circle></g>
+          </g>
+        </svg>
+        <div class="ar-center">
+          <b id="arPot">—</b>
+          <span id="arPotLabel">nothing staked yet</span>
         </div>
       </div>
 
-      <!-- entry for the next round -->
-      <div class="ar-pick">
-        <button class="ar-btn up" id="arUp" type="button">
-          <span class="ar-arrow">▲</span>
-          <span class="ar-side">UP</span>
-          <span class="ar-count"><b id="arUpN">0</b> in</span>
-        </button>
-        <button class="ar-btn down" id="arDown" type="button">
-          <span class="ar-arrow">▼</span>
-          <span class="ar-side">DOWN</span>
-          <span class="ar-count"><b id="arDownN">0</b> in</span>
-        </button>
-      </div>
-      <div class="ar-split"><i id="arSplit"></i></div>
-      <div class="ar-joins" id="arJoins" aria-live="polite"></div>
+      <div class="ar-stakes" id="arStakes"></div>
+      <button class="btn btn-lime btn-block" id="arThrow" type="button">Throw in</button>
 
-      <p class="ar-gate" id="arGate" hidden>Connect a wallet holding $ROBIN to pick a side.</p>
-
-      <!-- your standing -->
-      <div class="ar-you" id="arYou" hidden>
-        <div><span>Points</span><b id="arYouPts">0</b></div>
-        <div><span>Record</span><b id="arYouRec">0W · 0L</b></div>
-        <div><span>Streak</span><b id="arYouStreak">—</b></div>
-        <div><span>Rank</span><b id="arTier" hidden></b></div>
+      <div class="ar-wallet">
+        <span class="ar-you" id="arYou" hidden>You hold <b id="arYouPts">0</b> points</span>
+        <button class="ar-claim" id="arClaim" type="button">Claim your daily points</button>
       </div>
 
-      <div class="ar-strip-row">
-        <span class="ar-strip-label">Last rounds</span>
-        <div class="ar-strip" id="arStrip"></div>
-        <span class="ar-strip-label">Robin <b id="arRobinRec">—</b></span>
+      <ul class="ar-players" id="arPlayers"></ul>
+
+      <div class="ar-last" id="arLast" hidden>
+        <p class="ar-last-text" id="arLastText"></p>
+        <p class="ar-robin" id="arRobin" hidden></p>
+        <dl class="ar-fair" id="arFair" hidden>
+          <div><dt>Seed hash, before</dt><dd id="arFairHash">—</dd></div>
+          <div><dt>Seed, after</dt><dd id="arFairSeed">—</dd></div>
+          <div><dt>Winning ticket</dt><dd id="arFairTicket">—</dd></div>
+        </dl>
       </div>
 
       <details class="ar-boardwrap">
@@ -397,9 +373,8 @@
       </details>
 
       <p class="ar-note" id="arNote">
-        Nothing is deposited and nothing is at risk — entry is gated by the $ROBIN you already
-        hold, and a bigger bag scores faster. Rounds settle on the pool price at each boundary;
-        if that price is missing, the round voids rather than being guessed at.
+        Points are the only thing at stake — no tokens are ever deposited and nothing leaves your
+        wallet. Holding $ROBIN is what earns you an allowance each day, and a bigger bag earns more.
       </p>
     </div>
   </div>

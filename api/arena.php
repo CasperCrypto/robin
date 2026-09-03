@@ -1,32 +1,37 @@
 <?php
 /**
- * arena.php — the Robin Arena round engine.
+ * arena.php — Robin Arena: the jackpot engine.
  *
- * The game: back-to-back five-minute rounds on the $ROBIN price. While one
- * round is running, entry is open for the next, so a player is always watching
- * one and queued for the following. Pick UP or DOWN. Robin picks too, and his
- * record is public — the hook is beating him, not predicting a chart.
+ * Everyone throws points into a shared pot. When the round closes a wheel
+ * spins, one entry wins, and the winner takes everything. Your slice of the
+ * wheel is your share of the pot, so a bigger stake is better odds and never a
+ * guarantee.
  *
- * ── Three decisions worth reading before changing anything ────────────────
+ * ── Four decisions worth reading before changing anything ─────────────────
  *
- * 1. NOBODY DEPOSITS ANYTHING. Entry is gated by *holding* $ROBIN, checked
- *    server-side with balanceOf. That means no custody, no pot, and no
- *    private key anywhere near this server — which is the only responsible
- *    answer while the site runs on shared hosting. It still costs real money
- *    to farm the leaderboard with fake wallets, and a bigger bag scores
- *    faster, so the token still does work. Swapping in real pots later means
- *    changing settle() and nothing else; the front end never knew.
+ * 1. NOBODY DEPOSITS A TOKEN. The currency is points, and points come from a
+ *    daily allowance you can claim for *holding* $ROBIN — checked server-side
+ *    with balanceOf. So the stakes are real, the losses are real, and there is
+ *    no custody, no pot of anyone's money, and no private key anywhere near
+ *    this server. A bigger bag buys a bigger allowance, which is what the
+ *    token is for here.
  *
- * 2. ROUNDS ARE CLOCK SLOTS, NOT RECORDS. Round id is floor(time / ROUND_SEC),
+ * 2. IT IS PROVABLY FAIR. Each round's seed is generated and its SHA-256 hash
+ *    published before a single entry is taken. The winning ticket is
+ *    HMAC(seed, roundId) modulo the pot. After the round the seed itself is
+ *    published, so anyone can recompute the result and confirm it was decided
+ *    before they played. A game that asks people to risk something and cannot
+ *    show its working is just asking them to trust us.
+ *
+ * 3. ROUNDS ARE CLOCK SLOTS, NOT RECORDS. A round's id is floor(time / 90),
  *    so every visitor agrees on which round is live without anything having to
- *    create it. No cron is required: the first request after a round ends is
- *    what settles it.
+ *    create it, and no cron is required: the first request after a round
+ *    closes is what resolves it. Unlike a price game there is nothing
+ *    time-sensitive to capture, so a quiet hour costs nothing — the round
+ *    resolves correctly whenever someone next turns up.
  *
- * 3. A ROUND WITH NO PRICE VOIDS. Prices are snapshotted on every poll, and
- *    settlement uses the snapshot nearest the boundary. If there is none close
- *    enough — nobody was on the site — the round is void and nobody wins or
- *    loses. Settling a game on a price we had to guess at would be worse than
- *    not settling it at all.
+ * 4. A ROUND WITH ONE PLAYER IS RETURNED, NOT WON. Taking someone's stake and
+ *    handing it back as a "win" would be theatre.
  */
 
 declare(strict_types=1);
@@ -38,33 +43,31 @@ header('Cache-Control: no-store');
 require_once __DIR__ . '/lib.php';
 require_once __DIR__ . '/provider.php';
 
-const ROUND_SEC   = 300;      // one round
-const TICK_MAX_AGE= 20;       // refresh the price if the newest tick is older
-const SNAP_WINDOW = 100;      // a boundary price must be within this many seconds
-const HISTORY     = 12;       // rounds kept on the board
+/* Bump this whenever the tables below change shape. */
+const SCHEMA = 2;
 
-const TOKEN   = '0x280413fbF06CcC1114094A5967dB2191d49EE75e';
-const DECIMALS= 18;
-const RPC_URL = 'https://rpc.mainnet.chain.robinhood.com';
-const DS_URL  = 'https://api.dexscreener.com/latest/dex/tokens/';
+const ROUND_SEC = 90;      // one round, end to end
+const ENTRY_SEC = 65;      // …of which this much takes entries; the rest is the spin
+const HISTORY   = 8;
+const MIN_STAKE = 50;
+const CLAIM_SEC = 86400;   // one allowance a day
 
-/** Balance tiers. First match from the top wins. */
+const TOKEN    = '0x280413fbF06CcC1114094A5967dB2191d49EE75e';
+const DECIMALS = 18;
+const RPC_URL  = 'https://rpc.mainnet.chain.robinhood.com';
+
+/** Hold this much $ROBIN, claim this many points a day. */
 const TIERS = [
-    ['name' => 'Sheriff', 'min' => 5000000, 'mult' => 3.0],
-    ['name' => 'Outlaw',  'min' => 1000000, 'mult' => 2.0],
-    ['name' => 'Archer',  'min' =>  250000, 'mult' => 1.5],
-    ['name' => 'Scout',   'min' =>   50000, 'mult' => 1.0],
+    ['name' => 'Sheriff', 'min' => 5000000, 'daily' => 10000],
+    ['name' => 'Outlaw',  'min' => 1000000, 'daily' =>  4000],
+    ['name' => 'Archer',  'min' =>  250000, 'daily' =>  1500],
+    ['name' => 'Scout',   'min' =>   50000, 'daily' =>   500],
 ];
-const BASE_POINTS = 100;
 
-/* Test hooks: point the engine at a mock chain and a fake clock. */
+/* Test hooks: a fake clock and a mock chain. */
 function cfg(string $k, string $d): string { $v = getenv($k); return $v === false || $v === '' ? $d : $v; }
-function now(): int {
-    $t = getenv('ARENA_NOW');
-    return ($t !== false && $t !== '') ? (int)$t : time();
-}
+function now(): int { $t = getenv('ARENA_NOW'); return ($t !== false && $t !== '') ? (int)$t : time(); }
 function rpcUrl(): string { return cfg('ARENA_RPC', RPC_URL); }
-function dsUrl(): string  { return cfg('ARENA_DS', DS_URL); }
 
 /* ── storage ───────────────────────────────────────────────────────────── */
 function db(): PDO {
@@ -80,74 +83,89 @@ function db(): PDO {
 
     $pdo = new PDO('sqlite:' . $dir . '/arena.sqlite');
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->exec('PRAGMA journal_mode=WAL');       // survives concurrent visitors
-    $pdo->exec('PRAGMA busy_timeout=4000');
+    $pdo->exec('PRAGMA journal_mode=WAL');
+    $pdo->exec('PRAGMA busy_timeout=5000');
+
+    /* CREATE TABLE IF NOT EXISTS keeps whatever is already there, which is
+       exactly wrong across a version that changed the columns: an older build's
+       tables survive, half the queries still work against them, and the game
+       misbehaves in ways nobody can explain. Stamp the schema and start clean
+       when it does not match. Nothing here is worth migrating — points from a
+       game that no longer exists are not a record anyone wants kept. */
+    $have = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
+    if ($have !== SCHEMA) {
+        foreach (['entries', 'players', 'rounds', 'ticks'] as $t) $pdo->exec('DROP TABLE IF EXISTS ' . $t);
+        $pdo->exec('PRAGMA user_version = ' . SCHEMA);
+    }
+
     $pdo->exec('
       CREATE TABLE IF NOT EXISTS rounds(
-        id INTEGER PRIMARY KEY, status TEXT NOT NULL,
-        lock_price REAL, settle_price REAL,
-        robin_side TEXT, robin_note TEXT, robin_won INTEGER,
-        settled_at INTEGER);
+        id INTEGER PRIMARY KEY, seed TEXT NOT NULL, seed_hash TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT "open",
+        pot INTEGER DEFAULT 0, winner TEXT, ticket INTEGER,
+        resolved_at INTEGER, reaction TEXT);
       CREATE TABLE IF NOT EXISTS entries(
-        round_id INTEGER NOT NULL, addr TEXT NOT NULL, side TEXT NOT NULL,
-        tier TEXT NOT NULL, mult REAL NOT NULL, at INTEGER NOT NULL,
-        won INTEGER, points INTEGER,
+        round_id INTEGER NOT NULL, addr TEXT NOT NULL,
+        stake INTEGER NOT NULL, at INTEGER NOT NULL, seq INTEGER NOT NULL,
         PRIMARY KEY(round_id, addr));
       CREATE TABLE IF NOT EXISTS players(
-        addr TEXT PRIMARY KEY, points INTEGER DEFAULT 0, wins INTEGER DEFAULT 0,
-        played INTEGER DEFAULT 0, streak INTEGER DEFAULT 0, best INTEGER DEFAULT 0,
-        tier TEXT, seen INTEGER);
-      CREATE TABLE IF NOT EXISTS ticks(t INTEGER PRIMARY KEY, price REAL NOT NULL);
+        addr TEXT PRIMARY KEY, points INTEGER DEFAULT 0, staked INTEGER DEFAULT 0,
+        won INTEGER DEFAULT 0, rounds INTEGER DEFAULT 0, wins INTEGER DEFAULT 0,
+        biggest INTEGER DEFAULT 0, tier TEXT, last_claim INTEGER DEFAULT 0, seen INTEGER);
     ');
     return $pdo;
 }
 
 /* ── the clock ─────────────────────────────────────────────────────────── */
-function liveId(): int { return intdiv(now(), ROUND_SEC); }   // running now
-function openId(): int { return liveId() + 1; }               // taking entries
+function liveId(): int { return intdiv(now(), ROUND_SEC); }
 function startOf(int $id): int { return $id * ROUND_SEC; }
-
-/* ── price ─────────────────────────────────────────────────────────────── */
-/** Record a price snapshot if the newest one is stale. Returns the latest. */
-function tick(): ?float {
-    $db = db();
-    $row = $db->query('SELECT t, price FROM ticks ORDER BY t DESC LIMIT 1')->fetch(PDO::FETCH_ASSOC);
-    if ($row && now() - (int)$row['t'] < TICK_MAX_AGE) return (float)$row['price'];
-
-    $j = getJson(dsUrl() . TOKEN, 8);
-    $best = null;
-    foreach (($j['pairs'] ?? []) as $p) {
-        if (!$best || ($p['liquidity']['usd'] ?? 0) > ($best['liquidity']['usd'] ?? 0)) $best = $p;
-    }
-    $price = $best ? (float)($best['priceUsd'] ?? 0) : 0.0;
-    if ($price <= 0) return $row ? (float)$row['price'] : null;
-
-    $st = $db->prepare('INSERT OR REPLACE INTO ticks(t, price) VALUES(?, ?)');
-    $st->execute([now(), $price]);
-    $db->exec('DELETE FROM ticks WHERE t < ' . (now() - 86400));
-    return $price;
+function closesAt(int $id): int { return startOf($id) + ENTRY_SEC; }
+function phaseOf(int $id): string {
+    if ($id > liveId()) return 'pending';
+    if ($id < liveId()) return 'done';
+    return now() < closesAt($id) ? 'entry' : 'spin';
 }
 
-/** The snapshot nearest $when, or null if none is close enough to trust. */
-function priceAt(int $when): ?float {
-    $st = db()->prepare(
-        'SELECT price, ABS(t - ?) AS d FROM ticks WHERE ABS(t - ?) <= ? ORDER BY d LIMIT 1');
-    $st->execute([$when, $when, SNAP_WINDOW]);
+/* ── provably fair ─────────────────────────────────────────────────────── */
+/**
+ * Make sure the round exists and its seed is committed. The hash goes out
+ * immediately; the seed itself stays hidden until the round is resolved, so a
+ * player can check afterwards that the answer was fixed before they entered.
+ */
+function ensureRound(int $id): array {
+    $db = db();
+    $st = $db->prepare('SELECT * FROM rounds WHERE id = ?');
+    $st->execute([$id]);
     $r = $st->fetch(PDO::FETCH_ASSOC);
-    return $r ? (float)$r['price'] : null;
+    if ($r) return $r;
+
+    $seed = bin2hex(random_bytes(32));
+    try {
+        $db->prepare('INSERT INTO rounds(id, seed, seed_hash) VALUES(?,?,?)')
+           ->execute([$id, $seed, hash('sha256', $seed)]);
+    } catch (PDOException $e) {
+        // Another visitor created it in the same instant; theirs is the seed.
+    }
+    $st->execute([$id]);
+    return $st->fetch(PDO::FETCH_ASSOC);
+}
+
+/** The winning ticket for a round: a number in [0, pot). */
+function ticketFor(string $seed, int $roundId, int $pot): int {
+    $h = hash_hmac('sha256', (string)$roundId, $seed);
+    // 52 bits keeps this exact in a float and is far more range than any pot.
+    return (int)(hexdec(substr($h, 0, 13)) % max(1, $pot));
 }
 
 /* ── chain ─────────────────────────────────────────────────────────────── */
-/** balanceOf(addr), in whole tokens. null means we could not ask. */
+/** balanceOf(addr) in whole tokens. null means we could not ask. */
 function balanceOf(string $addr): ?float {
     $data = '0x70a08231' . str_pad(substr(strtolower($addr), 2), 64, '0', STR_PAD_LEFT);
-    $body = json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'eth_call',
-        'params' => [['to' => TOKEN, 'data' => $data], 'latest']]);
-
     $ch = curl_init(rpcUrl());
     curl_setopt_array($ch, [
         CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
-        CURLOPT_POSTFIELDS => $body,
+        CURLOPT_POSTFIELDS => json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'eth_call',
+            'params' => [['to' => TOKEN, 'data' => $data], 'latest']]),
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
     ]);
     $raw = curl_exec($ch);
@@ -155,12 +173,12 @@ function balanceOf(string $addr): ?float {
     curl_close($ch);
     if ($raw === false || $code !== 200) return null;
 
-    $j = json_decode((string)$raw, true);
-    $hex = $j['result'] ?? null;
+    $hex = json_decode((string)$raw, true)['result'] ?? null;
     if (!is_string($hex) || !preg_match('/^0x[0-9a-fA-F]*$/', $hex)) return null;
     $hex = ltrim(substr($hex, 2), '0');
     if ($hex === '') return 0.0;
-    // The balance overflows a 64-bit int at 18 decimals, so scale as a float.
+    // Balances overflow a 64-bit int at 18 decimals, so scale as a float. Only
+    // the leading digits matter — this decides a tier, not a payout.
     return (float)hexdec(substr($hex, 0, 15)) * pow(16, max(0, strlen($hex) - 15)) / pow(10, DECIMALS);
 }
 
@@ -169,123 +187,57 @@ function tierFor(float $balance): ?array {
     return null;
 }
 
-/* ── Robin's pick ──────────────────────────────────────────────────────── */
-/**
- * One model call per round, and only for the round now taking entries. If it
- * fails, Robin sits the round out — an invented pick would corrupt the one
- * number the whole feature rests on, which is his record.
- */
-function robinPick(int $roundId, ?float $price): void {
+/* ── resolution ────────────────────────────────────────────────────────── */
+function resolveDue(): void {
     $db = db();
-    $st = $db->prepare('SELECT robin_side FROM rounds WHERE id = ?');
-    $st->execute([$roundId]);
-    $row = $st->fetch(PDO::FETCH_ASSOC);
-    if ($row && $row['robin_side'] !== null) return;          // already called it
-    if (apiKey() === '') return;
-
-    $hist = $db->query("SELECT settle_price - lock_price AS d FROM rounds
-                        WHERE status = 'settled' ORDER BY id DESC LIMIT 6")
-               ->fetchAll(PDO::FETCH_COLUMN);
-    $moves = implode(', ', array_map(fn($d) => ($d > 0 ? '+' : '') . round((float)$d / max($price ?: 1e-9, 1e-9) * 100, 2) . '%', $hist));
-
-    $r = askText(
-        "You are Robin Nakamoto, a memecoin mascot who bets on his own token every five minutes.\n"
-      . "Price now: $" . ($price ?? 0) . "\n"
-      . "Last few 5-minute moves: " . ($moves ?: 'no history yet') . "\n\n"
-      . "Call the next five minutes. Reply with exactly two lines:\n"
-      . "UP or DOWN\n"
-      . "one sentence of trash talk, under 90 characters, in character, no emoji\n",
-        null, 20);
-
-    if ($r['text'] === null) return;
-    $lines = preg_split('/\R/', trim($r['text']));
-    $side  = strtoupper(trim($lines[0] ?? ''));
-    if ($side !== 'UP' && $side !== 'DOWN') return;
-    $note  = trim($lines[1] ?? '');
-
-    $db->prepare("INSERT INTO rounds(id, status, robin_side, robin_note) VALUES(?, 'open', ?, ?)
-                  ON CONFLICT(id) DO UPDATE SET robin_side = excluded.robin_side,
-                                                robin_note = excluded.robin_note")
-       ->execute([$roundId, $side, mb_substr($note, 0, 120)]);
-}
-
-/* ── settlement ────────────────────────────────────────────────────────── */
-/** Settle every finished round that has not been settled yet. */
-function settleDue(): void {
-    $db = db();
-    $live = liveId();
-
-    // Anything with entries or a Robin pick, plus anything a player joined.
-    $ids = $db->query('SELECT DISTINCT round_id FROM entries WHERE round_id < ' . $live)
+    $ids = $db->query("SELECT id FROM rounds WHERE status = 'open' ORDER BY id")
               ->fetchAll(PDO::FETCH_COLUMN);
-    $ids = array_unique(array_merge($ids, $db->query(
-        "SELECT id FROM rounds WHERE id < $live AND status NOT IN ('settled','void')")
-        ->fetchAll(PDO::FETCH_COLUMN)));
-    sort($ids);
 
     foreach ($ids as $id) {
         $id = (int)$id;
-        $st = $db->prepare('SELECT status FROM rounds WHERE id = ?');
-        $st->execute([$id]);
-        $s = $st->fetchColumn();
-        if ($s === 'settled' || $s === 'void') continue;
-
-        $lock   = priceAt(startOf($id));
-        $settle = priceAt(startOf($id + 1));
-
-        if ($lock === null || $settle === null) {
-            $db->prepare("INSERT INTO rounds(id, status) VALUES(?, 'void')
-                          ON CONFLICT(id) DO UPDATE SET status = 'void'")->execute([$id]);
-            $db->prepare('UPDATE entries SET won = NULL, points = 0 WHERE round_id = ?')->execute([$id]);
-            continue;
-        }
-
-        // Dead flat is a loss for nobody: it voids, rather than quietly
-        // handing the round to one side.
-        if ($settle === $lock) {
-            $db->prepare("INSERT INTO rounds(id, status, lock_price, settle_price) VALUES(?, 'void', ?, ?)
-                          ON CONFLICT(id) DO UPDATE SET status = 'void',
-                            lock_price = excluded.lock_price, settle_price = excluded.settle_price")
-               ->execute([$id, $lock, $settle]);
-            $db->prepare('UPDATE entries SET won = NULL, points = 0 WHERE round_id = ?')->execute([$id]);
-            continue;
-        }
-
-        $winner = $settle > $lock ? 'UP' : 'DOWN';
+        if (now() < closesAt($id)) continue;              // still taking entries
 
         $db->beginTransaction();
         try {
-            $st = $db->prepare('SELECT robin_side FROM rounds WHERE id = ?');
+            $st = $db->prepare('SELECT * FROM rounds WHERE id = ?');
             $st->execute([$id]);
-            $robin = $st->fetchColumn();
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$r || $r['status'] !== 'open') { $db->rollBack(); continue; }
 
-            $db->prepare("INSERT INTO rounds(id, status, lock_price, settle_price, robin_won, settled_at)
-                          VALUES(?, 'settled', ?, ?, ?, ?)
-                          ON CONFLICT(id) DO UPDATE SET status = 'settled',
-                            lock_price = excluded.lock_price, settle_price = excluded.settle_price,
-                            robin_won = excluded.robin_won, settled_at = excluded.settled_at")
-               ->execute([$id, $lock, $settle,
-                          $robin === false || $robin === null ? null : (int)($robin === $winner), now()]);
+            $es = $db->prepare('SELECT addr, stake FROM entries WHERE round_id = ? ORDER BY seq');
+            $es->execute([$id]);
+            $entries = $es->fetchAll(PDO::FETCH_ASSOC);
+            $pot = array_sum(array_map(fn($e) => (int)$e['stake'], $entries));
 
-            $rows = $db->prepare('SELECT addr, side, mult FROM entries WHERE round_id = ?');
-            $rows->execute([$id]);
-            foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $e) {
-                $won = $e['side'] === $winner;
+            // One player is not a game. Give it back.
+            if (count($entries) < 2) {
+                foreach ($entries as $e) {
+                    $db->prepare('UPDATE players SET points = points + ?, staked = staked - ? WHERE addr = ?')
+                       ->execute([(int)$e['stake'], (int)$e['stake'], $e['addr']]);
+                }
+                $db->prepare("UPDATE rounds SET status = 'void', pot = ?, resolved_at = ? WHERE id = ?")
+                   ->execute([$pot, now(), $id]);
+                $db->commit();
+                continue;
+            }
 
-                $p = $db->prepare('SELECT streak, best FROM players WHERE addr = ?');
-                $p->execute([$e['addr']]);
-                $cur = $p->fetch(PDO::FETCH_ASSOC) ?: ['streak' => 0, 'best' => 0];
+            $ticket = ticketFor($r['seed'], $id, $pot);
+            $acc = 0; $winner = $entries[0]['addr'];
+            foreach ($entries as $e) {
+                $acc += (int)$e['stake'];
+                if ($ticket < $acc) { $winner = $e['addr']; break; }
+            }
 
-                $streak = $won ? (int)$cur['streak'] + 1 : 0;
-                // A run is worth more than the same wins spread out; capped so
-                // one lucky night cannot put the board out of reach.
-                $points = $won ? (int)round(BASE_POINTS * (float)$e['mult'] * (1 + 0.2 * min($streak - 1, 5))) : 0;
+            $db->prepare("UPDATE rounds SET status = 'settled', pot = ?, winner = ?, ticket = ?, resolved_at = ?
+                          WHERE id = ?")->execute([$pot, $winner, $ticket, now(), $id]);
 
-                $db->prepare('UPDATE entries SET won = ?, points = ? WHERE round_id = ? AND addr = ?')
-                   ->execute([(int)$won, $points, $id, $e['addr']]);
-                $db->prepare('UPDATE players SET points = points + ?, wins = wins + ?, played = played + 1,
-                                streak = ?, best = MAX(best, ?) WHERE addr = ?')
-                   ->execute([$points, (int)$won, $streak, $streak, $e['addr']]);
+            foreach ($entries as $e) {
+                $isWinner = $e['addr'] === $winner;
+                $db->prepare('UPDATE players SET rounds = rounds + 1, wins = wins + ?,
+                                points = points + ?, won = won + ?, staked = staked - ?,
+                                biggest = MAX(biggest, ?) WHERE addr = ?')
+                   ->execute([(int)$isWinner, $isWinner ? $pot : 0, $isWinner ? $pot : 0,
+                              (int)$e['stake'], $isWinner ? $pot : 0, $e['addr']]);
             }
             $db->commit();
         } catch (Throwable $ex) {
@@ -296,149 +248,195 @@ function settleDue(): void {
 }
 
 /* ── views ─────────────────────────────────────────────────────────────── */
-function roundView(int $id): array {
-    $st = db()->prepare('SELECT * FROM rounds WHERE id = ?');
-    $st->execute([$id]);
-    $r = $st->fetch(PDO::FETCH_ASSOC) ?: [];
-
-    $c = db()->prepare('SELECT side, COUNT(*) n FROM entries WHERE round_id = ? GROUP BY side');
-    $c->execute([$id]);
-    $counts = ['UP' => 0, 'DOWN' => 0];
-    foreach ($c->fetchAll(PDO::FETCH_ASSOC) as $row) $counts[$row['side']] = (int)$row['n'];
-
-    // The last few people to pick, so the page can show them arriving. Just
-    // the address and the side — there is nothing else here worth showing.
-    $jn = db()->prepare('SELECT addr, side, tier FROM entries WHERE round_id = ? ORDER BY at DESC LIMIT 6');
-    $jn->execute([$id]);
+function roundView(int $id, bool $ensure = false): array {
+    $r = $ensure ? ensureRound($id) : null;
+    if (!$r) {
+        $st = db()->prepare('SELECT * FROM rounds WHERE id = ?');
+        $st->execute([$id]);
+        $r = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+    $es = db()->prepare('SELECT addr, stake FROM entries WHERE round_id = ? ORDER BY seq');
+    $es->execute([$id]);
+    $entries = array_map(fn($e) => ['addr' => $e['addr'], 'stake' => (int)$e['stake']],
+                         $es->fetchAll(PDO::FETCH_ASSOC));
+    $pot = array_sum(array_map(fn($e) => $e['stake'], $entries));
 
     return [
-        'id'         => $id,
-        'startsAt'   => startOf($id),
-        'endsAt'     => startOf($id + 1),
-        'status'     => $r['status'] ?? 'pending',
-        'lockPrice'  => isset($r['lock_price'])   ? (float)$r['lock_price']   : null,
-        'settlePrice'=> isset($r['settle_price']) ? (float)$r['settle_price'] : null,
-        'robinSide'  => $r['robin_side'] ?? null,
-        'robinNote'  => $r['robin_note'] ?? null,
-        'robinWon'   => isset($r['robin_won']) ? (bool)$r['robin_won'] : null,
-        'up'         => $counts['UP'],
-        'down'       => $counts['DOWN'],
-        'joins'      => $jn->fetchAll(PDO::FETCH_ASSOC),
+        'id'       => $id,
+        'startsAt' => startOf($id),
+        'closesAt' => closesAt($id),
+        'endsAt'   => startOf($id + 1),
+        'phase'    => $r && in_array($r['status'], ['settled', 'void'], true) ? $r['status'] : phaseOf($id),
+        'pot'      => $pot,
+        'entries'  => $entries,
+        'winner'   => $r['winner'] ?? null,
+        'ticket'   => isset($r['ticket']) ? (int)$r['ticket'] : null,
+        'seedHash' => $r['seed_hash'] ?? null,
+        // The seed is only ever published once the round can no longer be entered.
+        'seed'     => ($r && in_array($r['status'], ['settled', 'void'], true)) ? $r['seed'] : null,
+        'reaction' => $r['reaction'] ?? null,
     ];
-}
-
-function entryView(?string $addr, int $id): ?array {
-    if (!$addr) return null;
-    $st = db()->prepare('SELECT side, tier, mult, won, points FROM entries WHERE round_id = ? AND addr = ?');
-    $st->execute([$id, strtolower($addr)]);
-    $e = $st->fetch(PDO::FETCH_ASSOC);
-    return $e ? ['side' => $e['side'], 'tier' => $e['tier'], 'mult' => (float)$e['mult'],
-                 'won' => $e['won'] === null ? null : (bool)$e['won'], 'points' => (int)$e['points']] : null;
 }
 
 /* ── request ───────────────────────────────────────────────────────────── */
 $action = $_GET['a'] ?? 'state';
+$addr = null;
+if (isset($_GET['addr']) && preg_match('/^0x[0-9a-fA-F]{40}$/', $_GET['addr'])) {
+    $addr = strtolower($_GET['addr']);
+}
 
-if ($action === 'tick') {                    // for an optional keep-alive cron
-    $p = tick();
-    settleDue();
-    echo json_encode(['ok' => true, 'price' => $p, 'round' => liveId()]);
+/** The body of a POST, as an array. */
+function body(): array {
+    $b = json_decode((string)file_get_contents('php://input'), true);
+    return is_array($b) ? $b : [];
+}
+function requireAddr(array $b): string {
+    $a = strtolower(trim((string)($b['address'] ?? '')));
+    if (!preg_match('/^0x[0-9a-f]{40}$/', $a)) jfail(400, 'Connect a wallet first.');
+    return $a;
+}
+function player(string $a): array {
+    $st = db()->prepare('SELECT * FROM players WHERE addr = ?');
+    $st->execute([$a]);
+    return $st->fetch(PDO::FETCH_ASSOC) ?: ['addr' => $a, 'points' => 0, 'staked' => 0, 'won' => 0,
+        'rounds' => 0, 'wins' => 0, 'biggest' => 0, 'tier' => null, 'last_claim' => 0];
+}
+
+if ($action === 'claim') {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') jfail(405, 'POST only');
+    if (rateLimited('arena_claim', 20, 600)) jfail(429, 'Slow down a moment.');
+    $a = requireAddr(body());
+
+    $p = player($a);
+    $wait = (int)$p['last_claim'] + CLAIM_SEC - now();
+    if ($wait > 0) jfail(409, 'Next allowance in ' . ceil($wait / 3600) . 'h.', ['wait' => $wait]);
+
+    $bal = balanceOf($a);
+    if ($bal === null) jfail(503, 'Could not read your balance from the chain. Try again in a moment.');
+    $tier = tierFor($bal);
+    if (!$tier) {
+        jfail(403, 'You need at least ' . number_format(TIERS[count(TIERS) - 1]['min'])
+                 . ' $ROBIN to claim. You hold ' . number_format($bal) . '.');
+    }
+
+    db()->prepare('INSERT INTO players(addr, points, tier, last_claim, seen) VALUES(?,?,?,?,?)
+                   ON CONFLICT(addr) DO UPDATE SET points = points + excluded.points,
+                     tier = excluded.tier, last_claim = excluded.last_claim, seen = excluded.seen')
+        ->execute([$a, $tier['daily'], $tier['name'], now(), now()]);
+
+    $p = player($a);
+    echo json_encode(['ok' => true, 'claimed' => $tier['daily'], 'tier' => $tier['name'],
+                      'balance' => $bal, 'points' => (int)$p['points']]);
     exit;
 }
 
 if ($action === 'join') {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') jfail(405, 'POST only');
-    if (rateLimited('arena', 30, 300)) jfail(429, 'Slow down a moment.');
+    if (rateLimited('arena_join', 60, 300)) jfail(429, 'Slow down a moment.');
+    $b = body();
+    $a = requireAddr($b);
+    $stake = (int)($b['stake'] ?? 0);
 
-    $b = json_decode((string)file_get_contents('php://input'), true);
-    $addr = strtolower(trim((string)($b['address'] ?? '')));
-    $side = strtoupper(trim((string)($b['side'] ?? '')));
+    if ($stake < MIN_STAKE) jfail(400, 'Minimum stake is ' . MIN_STAKE . ' points.');
 
-    if (!preg_match('/^0x[0-9a-f]{40}$/', $addr)) jfail(400, 'Connect a wallet first.');
-    if ($side !== 'UP' && $side !== 'DOWN')       jfail(400, 'Pick UP or DOWN.');
+    $id = liveId();
+    if (now() >= closesAt($id)) jfail(409, 'This round has closed. The next one is seconds away.');
+    ensureRound($id);
 
-    $id = openId();
-
-    $bal = balanceOf($addr);
-    if ($bal === null) jfail(503, 'Could not read your balance from the chain. Try again in a moment.');
-    $tier = tierFor($bal);
-    if (!$tier) {
-        jfail(403, 'You need at least ' . number_format(TIERS[count(TIERS) - 1]['min'])
-                 . ' $ROBIN to enter. You hold ' . number_format($bal) . '.');
-    }
-
-    // Reading the balance takes a moment, and the clock can cross a boundary
-    // while it does. Re-check rather than dropping someone into a round that
-    // locked while they were being verified.
-    if (openId() !== $id) jfail(409, 'That round locked while you were joining. Try the next one.');
-
+    $db = db();
+    $db->beginTransaction();
     try {
-        db()->prepare('INSERT INTO entries(round_id, addr, side, tier, mult, at) VALUES(?,?,?,?,?,?)')
-            ->execute([$id, $addr, $side, $tier['name'], $tier['mult'], now()]);
-    } catch (PDOException $e) {
-        jfail(409, 'You are already in this round.');
-    }
-    db()->prepare('INSERT INTO players(addr, tier, seen) VALUES(?,?,?)
-                   ON CONFLICT(addr) DO UPDATE SET tier = excluded.tier, seen = excluded.seen')
-        ->execute([$addr, $tier['name'], now()]);
+        $p = player($a);
+        if ((int)$p['points'] < $stake) {
+            $db->rollBack();
+            jfail(400, 'You only have ' . (int)$p['points'] . ' points.');
+        }
+        // The clock can cross the close while the transaction is opening.
+        if (now() >= closesAt($id)) { $db->rollBack(); jfail(409, 'This round just closed.'); }
 
-    echo json_encode(['ok' => true, 'round' => $id, 'side' => $side,
-                      'tier' => $tier['name'], 'mult' => $tier['mult'], 'balance' => $bal]);
+        $seq = (int)$db->query('SELECT COALESCE(MAX(seq), 0) + 1 FROM entries WHERE round_id = ' . $id)
+                       ->fetchColumn();
+        $db->prepare('INSERT INTO entries(round_id, addr, stake, at, seq) VALUES(?,?,?,?,?)
+                      ON CONFLICT(round_id, addr) DO UPDATE SET stake = stake + excluded.stake')
+           ->execute([$id, $a, $stake, now(), $seq]);
+        $db->prepare('INSERT INTO players(addr, points, staked, seen) VALUES(?, ?, ?, ?)
+                      ON CONFLICT(addr) DO UPDATE SET points = points - ' . $stake . ',
+                        staked = staked + ' . $stake . ', seen = ' . now())
+           ->execute([$a, -$stake, $stake, now()]);
+        $db->commit();
+    } catch (Throwable $ex) {
+        if ($db->inTransaction()) $db->rollBack();
+        throw $ex;
+    }
+
+    $p = player($a);
+    echo json_encode(['ok' => true, 'round' => $id, 'stake' => $stake, 'points' => (int)$p['points']]);
+    exit;
+}
+
+if ($action === 'react') {
+    /* Robin's line about a finished round. Separate from the poll on purpose:
+       it costs a model call and a second or two, and the board should never
+       wait on it. */
+    $id = (int)($_GET['round'] ?? 0);
+    $st = db()->prepare('SELECT * FROM rounds WHERE id = ?');
+    $st->execute([$id]);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$r || $r['status'] !== 'settled') jfail(404, 'No such finished round.');
+    if ($r['reaction']) { echo json_encode(['reaction' => $r['reaction']]); exit; }
+    if (apiKey() === '' || rateLimited('arena_react', 60, 600)) { echo json_encode(['reaction' => null]); exit; }
+
+    $es = db()->prepare('SELECT addr, stake FROM entries WHERE round_id = ? ORDER BY stake DESC');
+    $es->execute([$id]);
+    $entries = $es->fetchAll(PDO::FETCH_ASSOC);
+    $win = null;
+    foreach ($entries as $e) if ($e['addr'] === $r['winner']) $win = (int)$e['stake'];
+
+    $out = askText(
+        "You are Robin Nakamoto, the mascot who runs a jackpot game on his own memecoin site.\n"
+      . "A round just finished.\n"
+      . "Players: " . count($entries) . "\n"
+      . "Pot: " . (int)$r['pot'] . " points\n"
+      . "The winner staked " . (int)$win . " of it, so their odds were about "
+      . round($win / max(1, (int)$r['pot']) * 100) . "%.\n\n"
+      . "React in ONE sentence under 90 characters. In character, dry, no emoji, no hashtags.\n"
+      . "Do not congratulate anyone by name and do not invent numbers.\n", null, 20);
+
+    $line = $out['text'] ? mb_substr(trim(preg_replace('/\s+/', ' ', $out['text'])), 0, 140) : null;
+    if ($line) db()->prepare('UPDATE rounds SET reaction = ? WHERE id = ?')->execute([$line, $id]);
+    echo json_encode(['reaction' => $line]);
     exit;
 }
 
 /* default: the whole board */
-$price = tick();
-settleDue();
-robinPick(openId(), $price);
-
-$addr = isset($_GET['addr']) && preg_match('/^0x[0-9a-fA-F]{40}$/', $_GET['addr'])
-      ? strtolower($_GET['addr']) : null;
-
-$top = db()->query('SELECT addr, points, wins, played, streak, best, tier FROM players
-                    WHERE played > 0 ORDER BY points DESC, wins DESC LIMIT 10')
-           ->fetchAll(PDO::FETCH_ASSOC);
+resolveDue();
+$live = liveId();
+ensureRound($live);
 
 $recent = [];
-for ($i = 1; $i <= HISTORY; $i++) $recent[] = roundView(liveId() - $i);
+for ($i = 1; $i <= HISTORY; $i++) $recent[] = roundView($live - $i);
+
+$top = db()->query('SELECT addr, points, won, wins, rounds, biggest, tier FROM players
+                    WHERE rounds > 0 OR points > 0 ORDER BY points + won DESC LIMIT 10')
+           ->fetchAll(PDO::FETCH_ASSOC);
 
 $me = null;
 if ($addr) {
-    $st = db()->prepare('SELECT points, wins, played, streak, best, tier FROM players WHERE addr = ?');
-    $st->execute([$addr]);
-    $me = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    $p = player($addr);
+    $me = ['points' => (int)$p['points'], 'staked' => (int)$p['staked'], 'won' => (int)$p['won'],
+           'wins' => (int)$p['wins'], 'rounds' => (int)$p['rounds'], 'biggest' => (int)$p['biggest'],
+           'tier' => $p['tier'], 'claimIn' => max(0, (int)$p['last_claim'] + CLAIM_SEC - now())];
 }
-
-$last = null;
-if ($addr) {
-    $st = db()->prepare('SELECT round_id, side, won, points FROM entries
-                         WHERE addr = ? AND won IS NOT NULL ORDER BY round_id DESC LIMIT 1');
-    $st->execute([$addr]);
-    $l = $st->fetch(PDO::FETCH_ASSOC);
-    if ($l) $last = ['round' => (int)$l['round_id'], 'side' => $l['side'],
-                     'won' => (bool)$l['won'], 'points' => (int)$l['points']];
-}
-
-$rw = db()->query('SELECT SUM(robin_won) w, COUNT(robin_won) n FROM rounds WHERE robin_won IS NOT NULL')
-          ->fetch(PDO::FETCH_ASSOC);
 
 echo json_encode([
-    'now'      => now(),
-    'roundSec' => ROUND_SEC,
-    'price'    => $price,
-    'live'     => roundView(liveId()),
-    'open'     => roundView(openId()),
-    'yourLive' => entryView($addr, liveId()),
-    'yourOpen' => entryView($addr, openId()),
-    'you'      => $me ? ['points' => (int)$me['points'], 'wins' => (int)$me['wins'],
-                         'played' => (int)$me['played'], 'streak' => (int)$me['streak'],
-                         'best' => (int)$me['best'], 'tier' => $me['tier'],
-                         /* The last round that actually resolved for this player. The page
-                            uses the round id to celebrate a win exactly once, however many
-                            times it polls. */
-                         'last' => $last] : null,
-    'robin'    => ['wins' => (int)($rw['w'] ?? 0), 'rounds' => (int)($rw['n'] ?? 0)],
-    'top'      => $top,
-    'recent'   => $recent,
-    'tiers'    => TIERS,
+    'now'       => now(),
+    'roundSec'  => ROUND_SEC,
+    'entrySec'  => ENTRY_SEC,
+    'minStake'  => MIN_STAKE,
+    'live'      => roundView($live, true),
+    'last'      => $recent ? $recent[0] : null,
+    'you'       => $me,
+    'top'       => $top,
+    'recent'    => $recent,
+    'tiers'     => TIERS,
 ], JSON_UNESCAPED_SLASHES);

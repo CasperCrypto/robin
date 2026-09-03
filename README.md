@@ -229,10 +229,9 @@ nothing left worth tuning. Set `swap.showSlippage: true` to bring it back.
 doesn't have it, reads real balances, quotes from the live pool and shows minimum
 received at your slippage. See below for the two execution modes.
 
-**Robin Arena** — five-minute rounds on the $ROBIN price. Call UP or DOWN,
-climb the board. Robin calls every round too and his record is public, so the
-hook is beating him. Entry is gated by the $ROBIN you hold — nobody deposits
-anything and nothing is at risk. See below.
+**Robin Arena** — a provably fair jackpot. Claim points daily for holding
+$ROBIN, throw them into the pot, and watch the wheel. Your slice is your share;
+one entry takes the lot. No tokens are ever deposited. See below.
 
 **Community** — the three posts named in `config.tweets` are embedded
 individually, which is far more reliable than a timeline widget: timelines are
@@ -245,73 +244,80 @@ URL into `tweets`, newest first.
 
 ## Robin Arena (the game)
 
-Back-to-back five-minute rounds on the $ROBIN price. While one round runs,
-entry is open for the next, so there is always something to watch and something
-to pick. Call UP or DOWN; everyone who got it right moves up the board.
+Everyone throws points into one pot. Your slice of the wheel is your share of
+the pot. When the round closes the wheel spins and one entry takes everything.
 
-**Robin plays every round.** One model call per round — he reads the price and
-the last few moves, picks a side, and talks trash about it before the round
-locks. His record is public and permanent, so the hook is *beating Robin*
-rather than predicting a chart. That is also the entire AI budget for the
-feature: about 288 calls a day, and if the call fails he sits the round out
-rather than having a pick invented for him.
+Rounds are 90 seconds: 65 taking entries, then the spin and the result.
 
-### Nobody deposits anything
+### Nobody deposits a token
 
-Entry is gated by the $ROBIN a wallet already **holds**, checked server-side
-with `balanceOf`. There is no pot, no custody, and no private key anywhere near
-the server — which is the only responsible answer while the site runs on shared
-hosting. A bigger bag scores faster, and farming the leaderboard with fake
-wallets costs real money per wallet, so the token still does the work.
+The currency is **points**, and points come from a daily allowance you claim
+for *holding* $ROBIN — checked server-side with `balanceOf`. So the stakes are
+real and the losses are real, and there is still no custody, no pot of anyone's
+money, and no private key anywhere near the server. A bigger bag buys a bigger
+allowance, which is what the token does here.
 
-| Rank | Holds | Points multiplier |
+| Rank | Holds | Points per day |
 |---|---|---|
-| Scout | 50,000 | ×1 |
-| Archer | 250,000 | ×1.5 |
-| Outlaw | 1,000,000 | ×2 |
-| Sheriff | 5,000,000 | ×3 |
+| Scout | 50,000 | 500 |
+| Archer | 250,000 | 1,500 |
+| Outlaw | 1,000,000 | 4,000 |
+| Sheriff | 5,000,000 | 10,000 |
 
-A win pays `100 × multiplier`, rising by 20% per consecutive win up to five in
-a row. A loss costs nothing but the streak. Edit `TIERS` and `BASE_POINTS` at
-the top of `api/arena.php` to change any of it.
+Minimum stake is 50 points, you can top up during a round, and season prizes in
+real $ROBIN are yours to pay from a treasury wallet against the leaderboard.
+Edit `TIERS`, `MIN_STAKE`, `ROUND_SEC` and `ENTRY_SEC` at the top of
+`api/arena.php`.
 
-**Turning it into real pots later** means changing `settle()` and nothing else
-— the front end never knew where the reward came from. Do that on a VPS with a
-capped hot wallet, or properly on-chain with a prediction contract where this
-server only posts prices. Not on shared hosting.
+### It is provably fair, and you can check it on the page
 
-### Three decisions in the engine
+Each round's seed is generated and its **SHA-256 hash published before a single
+entry is taken**. The winning ticket is `HMAC(seed, roundId)` modulo the pot.
+Once the round is over the seed itself is published, so anyone can recompute
+the result and confirm it was fixed before they played. The panel shows the
+hash, the seed and the ticket for the last round.
 
-**Rounds are clock slots, not records.** A round's id is `floor(time / 300)`,
-so every visitor agrees on which round is live without anything having to
-create it. No cron is needed: the first request after a round ends is what
-settles it.
+The wheel lands on the published ticket, not on the middle of the winner's
+slice — what you watch is the actual result being revealed.
 
-**A round with no price voids.** Prices are snapshotted on every poll, and
-settlement uses the snapshot nearest the boundary. If there is none within 100
-seconds — nobody was on the site — the round voids and nobody wins or loses. A
-round that did not move voids too, rather than quietly handing it to one side.
+A game that asks people to risk something and cannot show its working is just
+asking them to trust us. `test/arena.test.sh` reimplements the check in Python
+and asserts the server's answer matches.
 
-**Quiet sites void more rounds.** If that bothers you, add a cPanel cron job to
-keep the price ticking while nobody is looking:
+### Three more decisions in the engine
 
-```
-*/2 * * * * curl -s https://shopping.io/robin/api/arena.php?a=tick > /dev/null
-```
+**Rounds are clock slots, not records.** A round's id is `floor(time / 90)`, so
+every visitor agrees on which round is live without anything having to create
+it. No cron is needed: the first request after a round closes is what resolves
+it, and because nothing here is time-sensitive to capture, a quiet hour costs
+nothing — the round resolves correctly whenever someone next turns up.
 
-It is optional. Nothing breaks without it.
+**A round with one player is returned, not won.** Taking someone's stake and
+handing it back as a "win" would be theatre.
+
+**The schema is versioned.** `CREATE TABLE IF NOT EXISTS` keeps whatever is
+already there, which is exactly wrong across a build that changed the columns:
+the old tables survive, half the queries still work against them, and the game
+misbehaves in ways nobody can explain. The database carries a version stamp and
+is rebuilt when it does not match.
 
 ### What it needs from the server
 
-PHP 7.4+ with **cURL** and **PDO SQLite**. The database is created on first use
-at `api/data/arena.sqlite`; that folder ships with its own deny rule and the
-root `.htaccess` blocks `*.sqlite` as well. If `pdo_sqlite` is missing the
-arena says so plainly instead of failing strangely.
+PHP 7.4+ with **cURL** and **PDO SQLite**. In cPanel: **Select PHP Version** →
+tick `pdo_sqlite`. The database is created on first use at
+`api/data/arena.sqlite`; that folder ships with its own deny rule and the root
+`.htaccess` blocks `*.sqlite` too. If `pdo_sqlite` is missing the arena says so
+plainly rather than failing strangely.
 
-`test/arena.test.sh` drives the engine through a full game on a controlled
-clock and a controlled price — entry bar, tiers, double entry, settlement in
-both directions, streaks, and both ways a round can void.
-`test/arena-ui.test.js` does the same through a browser against the real PHP.
+### Where the AI is
+
+One call per finished round, and only when someone asks for it: the page
+requests Robin's reaction *after* the result is on screen, so the board never
+waits on a model. He gets the player count, the pot and the winner's odds, and
+writes one line about it. Everything else in the game is arithmetic.
+
+Without an API key the arena runs exactly as it does with one; Robin just
+stays quiet.
 
 ### The AI key
 
@@ -334,9 +340,6 @@ one real request and prove it end to end.
 | `no root answered` | Key is wrong, or your API root is none of the ones tried |
 | `CONNECT tunnel failed` | Your host blocks outbound HTTPS — ask them to allow it |
 | `The API key was rejected` | The key is wrong, inactive, or out of credit |
-
-Without a key the arena runs exactly as it does with one; Robin simply sits
-every round out.
 
 **It configures itself.** On the first request the proxy works out the API
 root, auth header and request shape using cheap `GET`s only — `/models` to find
@@ -418,8 +421,8 @@ What each one is for:
 | `smoke.test.js` | Boots the whole page in jsdom with the network stubbed; the DOM populated and nothing threw |
 | `discovery.test.sh` | Finds a provider whose root, auth header and request shape all differ from the defaults; a 400 advances the search, a 5xx is retried once |
 | `scan.test.sh` | The scanner's scoring against known token profiles: a clean token passes, a rug is called, and unreachable sources produce "could not check" rather than an accusation |
-| `arena.test.sh` | The round engine on a controlled clock: the entry bar, tiers, double entry, settlement both ways, streaks, and both ways a round voids |
-| `arena-ui.test.js` | The arena in a browser against the real PHP — the countdown agrees with the server, a pick reaches it, a second pick is refused |
+| `arena.test.sh` | The jackpot engine on a controlled clock: allowances by tier, the daily limit, staking rules, resolution, points conservation, a one-player round returned — and an independent reimplementation of the fairness check |
+| `arena-ui.test.js` | The arena in a browser against the real PHP — claiming, staking, the wheel matching the recorded entries, and over-staking refused by the server |
 | `motion.test.js` | Animations still run under `prefers-reduced-motion` (Android battery saver sets it), and the glass panels are static except when one arrives |
 | `buypop.test.js` | Buy notifications replay on load, exactly one is on screen at a time, and a silent chain shows nothing at all |
 | `shots.js` | Renders in Chromium at three widths and reports horizontal overflow or undersized tap targets |
