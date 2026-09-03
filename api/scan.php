@@ -23,11 +23,9 @@ header('Cache-Control: no-store');
    It only runs its self-test when asked for one over HTTP, so requiring it
    here just brings the functions along. */
 require_once __DIR__ . '/provider.php';
+require_once __DIR__ . '/chain.php';
 require_once __DIR__ . '/lib.php';
 
-define('EXPLORER_API', getenv('SCAN_EXPLORER') ?: 'https://robinhoodchain.blockscout.com/api/v2');
-define('DS_API',       getenv('SCAN_DS')       ?: 'https://api.dexscreener.com/latest/dex');
-const CHAIN_RPC    = 'https://rpc.mainnet.chain.robinhood.com';
 
 const SCAN_RATE_MAX = 20;
 const SCAN_RATE_WIN = 600;
@@ -58,10 +56,10 @@ if (is_readable($cacheFile) && filemtime($cacheFile) > time() - CACHE_TTL) {
 }
 
 /* ── gather ────────────────────────────────────────────────────────────── */
-$token    = getJson(EXPLORER_API . '/tokens/' . $addr, 12, $tokenStatus);
-$holders  = getJson(EXPLORER_API . '/tokens/' . $addr . '/holders?limit=20', 12, $holderStatus);
-$contract = getJson(EXPLORER_API . '/smart-contracts/' . $addr, 12, $contractStatus);
-$pairs    = getJson(DS_API . '/tokens/' . $addr, 12, $dsStatus);
+$token    = getJson(ROBIN_EXPLORER . '/tokens/' . $addr, 12, $tokenStatus);
+$holders  = getJson(ROBIN_EXPLORER . '/tokens/' . $addr . '/holders?limit=20', 12, $holderStatus);
+$contract = getJson(ROBIN_EXPLORER . '/smart-contracts/' . $addr, 12, $contractStatus);
+$pairs    = getJson(ROBIN_DEX . '/tokens/' . $addr, 12, $dsStatus);
 
 $name    = $token['name']   ?? null;
 $symbol  = $token['symbol'] ?? null;

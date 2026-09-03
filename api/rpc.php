@@ -19,11 +19,12 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/chain.php';
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
 
-const RPC_URL   = 'https://rpc.mainnet.chain.robinhood.com';
 const TIMEOUT   = 20;
 const MAX_BODY  = 32768;      // bytes accepted from the browser
 const RATE_MAX  = 240;        // calls…
@@ -88,7 +89,7 @@ if (count($hits) >= RATE_MAX) {
 $hits[] = $now;
 @file_put_contents($bucket, json_encode($hits), LOCK_EX);
 
-$ch = curl_init(RPC_URL);
+$ch = curl_init(ROBIN_RPC);
 curl_setopt_array($ch, [
     CURLOPT_POST => true,
     CURLOPT_RETURNTRANSFER => true,

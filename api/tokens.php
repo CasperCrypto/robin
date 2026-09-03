@@ -23,10 +23,8 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: public, max-age=60');
 
+require_once __DIR__ . '/chain.php';
 require_once __DIR__ . '/lib.php';
-
-define('TOK_EXPLORER', getenv('SCAN_EXPLORER') ?: 'https://robinhoodchain.blockscout.com/api/v2');
-define('TOK_DS',       getenv('SCAN_DS')       ?: 'https://api.dexscreener.com/latest/dex');
 
 const CACHE_TTL  = 300;     // a list this size does not change minute to minute
 const MAX_TOKENS = 120;     // how far down the explorer's list to go
@@ -40,7 +38,7 @@ if (empty($_GET['fresh']) && is_readable($cacheFile) && filemtime($cacheFile) > 
 }
 
 /* ── the universe ───────────────────────────────────────────────────────── */
-$listing = getJson(TOK_EXPLORER . '/tokens?type=ERC-20', 12, $listStatus);
+$listing = getJson(ROBIN_EXPLORER . '/tokens?type=ERC-20', 12, $listStatus);
 $items = $listing['items'] ?? [];
 
 $meta = [];
@@ -59,7 +57,7 @@ foreach (array_slice($items, 0, MAX_TOKENS) as $t) {
 /* ── the numbers ────────────────────────────────────────────────────────── */
 $reachedDs = false;
 foreach (array_chunk(array_keys($meta), BATCH) as $chunk) {
-    $j = getJson(TOK_DS . '/tokens/' . implode(',', $chunk), 12, $dsStatus);
+    $j = getJson(ROBIN_DEX . '/tokens/' . implode(',', $chunk), 12, $dsStatus);
     if ($j === null) continue;
     $reachedDs = true;
 

@@ -24,9 +24,9 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: public, max-age=600');
 
+require_once __DIR__ . '/chain.php';
 require_once __DIR__ . '/lib.php';
 
-const DEST_CHAIN = 4663;
 const NATIVE     = '0x0000000000000000000000000000000000000000';
 const SOL_MINT   = 'So11111111111111111111111111111111111111112';   // wrapped SOL
 const ONE_SOL    = '1000000000';                                     // lamports
@@ -50,7 +50,7 @@ function providers(): array {
         return $out;
     }
 
-    $dest = DEST_CHAIN;
+    $dest = ROBIN_CHAIN_ID;
     return [
         'lifi' => [
             'name' => 'LI.FI', 'method' => 'GET',
@@ -178,7 +178,7 @@ $status = $works ? 'available' : ($answered ? 'none' : 'unknown');
 
 $out = [
     'from'      => 'solana',
-    'toChain'   => DEST_CHAIN,
+    'toChain'   => ROBIN_CHAIN_ID,
     /* available — somebody quoted the route, so one click is possible
        none      — everyone answered and nobody can, so the manual path is honest
        unknown   — nobody answered; we learned nothing and must not pretend we did */

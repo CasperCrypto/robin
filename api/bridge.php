@@ -25,9 +25,9 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: public, max-age=300');
 
+require_once __DIR__ . '/chain.php';
 require_once __DIR__ . '/lib.php';
 
-const CHAIN_ID  = 4663;
 const CACHE_TTL = 86400;      // re-ask once a day
 const PROBE_TIMEOUT = 8;
 
@@ -86,10 +86,10 @@ function hasId(array $rows, array $keys): bool {
         foreach ($keys as $k) {
             if (!isset($row[$k])) continue;
             $v = $row[$k];
-            if (is_int($v) && $v === CHAIN_ID) return true;
+            if (is_int($v) && $v === ROBIN_CHAIN_ID) return true;
             if (is_string($v)) {
-                if ($v === (string)CHAIN_ID) return true;
-                if (preg_match('/(?:^|:)' . CHAIN_ID . '$/', $v)) return true;
+                if ($v === (string)ROBIN_CHAIN_ID) return true;
+                if (preg_match('/(?:^|:)' . ROBIN_CHAIN_ID . '$/', $v)) return true;
             }
         }
     }
@@ -120,7 +120,7 @@ $asked   = count(array_filter($results, fn($r) => $r['reachable']));
 $verdict = $supported ? 'available' : ($asked ? 'none' : 'unknown');
 
 $out = [
-    'chainId'   => CHAIN_ID,
+    'chainId'   => ROBIN_CHAIN_ID,
     /* available — at least one aggregator lists the chain
        none      — we asked and nobody does, so the manual route is the honest one
        unknown   — nobody answered, so we know nothing and should not claim to */

@@ -8,6 +8,52 @@ deploy — upload the folder and it runs.
 
 ---
 
+## Relaunching this for another token
+
+Nothing here is welded to $ROBIN. Working outwards from the smallest change:
+
+**1. The two config files.** `assets/js/config.js` for the browser and
+`api/chain.php` for the server. Between them they hold the token address,
+decimals, chain id, RPC, explorer, socials, the posts to embed, the supply
+facts and every fee. Every endpoint and every script reads from these — they
+used to be copied across six PHP files, which is exactly the kind of thing that
+makes a relaunch miserable, so they are not any more.
+
+**2. The artwork.** Replace the files in `assets/img/` keeping the same names,
+and nothing else needs touching:
+
+| File | What it is |
+|---|---|
+| `robin-logo.png` / `.webp` | the square mark, used in the nav, the swap panel and the arena |
+| `robin-logo-128.*` | the same at icon size |
+| `robin-doge.webp` / `.gif` | the animated hero character |
+| `robin-doge-poster.webp` | its first frame, shown while the animation loads |
+| `robin-banner.*` | the social preview card |
+| `robin-wordmark.png` | optional — the hero wordmark, if you have art for it |
+| `favicon*`, `apple-touch-icon.png` | browser and home-screen icons |
+| `grain.png` | the background texture; keep this one |
+
+**3. The palette.** About a dozen custom properties at the top of
+`assets/css/style.css` — `--lime-*` is the brand ramp, `--moss*` the darker
+accent, `--ink*` the dark surfaces. Change the ramp and the whole site follows,
+including the glass, the buttons and the charts.
+
+**4. The words.** `index.html` is the only file with real copy in it — the
+hero, the tokenomics tiles, the FAQ, the how-to-buy steps. The marquee strip
+lives in `assets/js/app.js`.
+
+What you should not need to touch: the arena, the room, the swap engine, the
+token picker, the bridge and route probes, the buy feed, the wallet layer, or
+any of the tests. They are all written against whatever the config says.
+
+**Things to actually decide before launching again**, all of them already
+flagged in their own sections below: `swap.feePct` must match the real tax on
+the new token, `swap.feeRecipient` is what turns your own cut on, the arena's
+tier thresholds assume a supply and a price, and `contracts/RobinJackpot.sol`
+is unaudited and wants a testnet run first.
+
+---
+
 ## Deploy to InMotion (or any cPanel host)
 
 Plain HTML, CSS and JavaScript plus two PHP files. No build step, no npm, no
@@ -29,6 +75,7 @@ public_html/robin/
     ├── route.php     ← can Solana money actually get here?
     ├── data/         ← the arena's database (created on first use)
     ├── scan.php      ← token scanner (no UI; still answers)
+    ├── chain.php     ← the token and chain, in one place
     ├── provider.php  ← your AI provider connection
     ├── lib.php       ← shared HTTP + the summary prompt
     ├── rpc.php       ← chain relay, fixes an empty buy feed

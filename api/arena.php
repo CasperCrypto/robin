@@ -40,6 +40,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
 
+require_once __DIR__ . '/chain.php';
 require_once __DIR__ . '/lib.php';
 require_once __DIR__ . '/provider.php';
 
@@ -52,9 +53,6 @@ const HISTORY   = 8;
 const MIN_STAKE = 50;
 const CLAIM_SEC = 86400;   // one allowance a day
 
-const TOKEN    = '0x280413fbF06CcC1114094A5967dB2191d49EE75e';
-const DECIMALS = 18;
-const RPC_URL  = 'https://rpc.mainnet.chain.robinhood.com';
 
 /** Hold this much $ROBIN, claim this many points a day. */
 const TIERS = [
@@ -67,7 +65,7 @@ const TIERS = [
 /* Test hooks: a fake clock and a mock chain. */
 function cfg(string $k, string $d): string { $v = getenv($k); return $v === false || $v === '' ? $d : $v; }
 function now(): int { $t = getenv('ARENA_NOW'); return ($t !== false && $t !== '') ? (int)$t : time(); }
-function rpcUrl(): string { return cfg('ARENA_RPC', RPC_URL); }
+function rpcUrl(): string { return cfg('ARENA_RPC', ROBIN_RPC); }
 
 /* ── storage ───────────────────────────────────────────────────────────── */
 function db(): PDO {
@@ -165,7 +163,7 @@ function balanceOf(string $addr): ?float {
     curl_setopt_array($ch, [
         CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
         CURLOPT_POSTFIELDS => json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'eth_call',
-            'params' => [['to' => TOKEN, 'data' => $data], 'latest']]),
+            'params' => [['to' => ROBIN_TOKEN, 'data' => $data], 'latest']]),
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
     ]);
     $raw = curl_exec($ch);
@@ -179,7 +177,7 @@ function balanceOf(string $addr): ?float {
     if ($hex === '') return 0.0;
     // Balances overflow a 64-bit int at 18 decimals, so scale as a float. Only
     // the leading digits matter — this decides a tier, not a payout.
-    return (float)hexdec(substr($hex, 0, 15)) * pow(16, max(0, strlen($hex) - 15)) / pow(10, DECIMALS);
+    return (float)hexdec(substr($hex, 0, 15)) * pow(16, max(0, strlen($hex) - 15)) / pow(10, ROBIN_DECIMALS);
 }
 
 function tierFor(float $balance): ?array {
