@@ -42,6 +42,7 @@ const AUTH_STYLE = 'bearer';
 /** Endpoint paths appended to API_ROOT. */
 const PATH_RESPONSES = '/responses';
 const PATH_CHAT      = '/chat/completions';
+const PATH_IMAGES    = '/images/generations';
 const PATH_MODELS    = '/models';
 
 /**
@@ -482,32 +483,54 @@ if (isset($_GET['selftest'])) {
               . (!empty($ep['guessed']) ? '   (guessed — discovery found nothing)' : '   (discovered)'));
 
         $prompt = 'Draw a simple flat green circle on a white background.';
-        [$code, $j, $raw, $cerr] = attempt($ep, $key, MODEL, $prompt, null);
-        $line('HTTP       ' . ($code ?: 'ERR'));
+        $won = false;
 
-        if ($raw === false) {
-            $line('           ' . $cerr);
-        } else {
-            $img = extractImage(is_array($j) ? $j : []);
-            if ($img) {
-                $line('RESULT     an image came back (' . strlen($img) . ' chars)');
+        foreach (shapeOrder($ep['shape']) as $shape) {
+            $try = array_merge($ep, ['shape' => $shape]);
+            $path = $shape === 'chat' ? PATH_CHAT
+                  : ($shape === 'images' ? PATH_IMAGES : PATH_RESPONSES);
+
+            $line();
+            $line(strtoupper($shape) . '  POST ' . $ep['root'] . $path);
+            [$c, $jj, $raw, $ce] = attempt($try, $key, MODEL, $prompt, null);
+
+            if ($raw === false) { $line('  ERR      ' . $ce); break; }
+            $line('  HTTP     ' . $c);
+
+            $img = extractImage(is_array($jj) ? $jj : []);
+            if ($c === 200 && $img) {
+                $line('  RESULT   an image came back (' . strlen($img) . ' chars)');
                 $line();
-                $line('Everything works. The site caches this combination, so nothing');
-                $line('needs changing in the config.');
-            } else {
-                $err  = $j['error']['message'] ?? $j['message'] ?? '';
-                $said = is_string($j['choices'][0]['message']['content'] ?? null)
-                      ? $j['choices'][0]['message']['content'] : '';
-                $line('RESULT     NO IMAGE');
-                if ($err)  $line('           provider said: ' . substr($err, 0, 250));
-                if ($said) $line('           model replied with text: "' . substr(trim($said), 0, 180) . '"');
-                if (!$err && !$said) {
-                    $line('           raw: ' . substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 500));
-                }
-                $line();
-                $line('If the provider named a model problem, put a model it does serve');
-                $line('into ai.model in assets/js/config.js — see the list above.');
+                $line('>>> THIS SHAPE WORKS: ' . $shape);
+                $line('    The site has cached it; nothing needs changing.');
+                discoSave($try);
+                $won = true;
+                break;
             }
+
+            $err  = $jj['error']['message'] ?? $jj['message'] ?? '';
+            $said = is_string($jj['choices'][0]['message']['content'] ?? null)
+                  ? $jj['choices'][0]['message']['content'] : '';
+            if ($err)  $line('  SAID     ' . substr($err, 0, 300));
+            if ($said) $line('  TEXT     "' . substr(trim($said), 0, 200) . '"');
+            if (!$err && !$said) {
+                $line('  RAW      ' . substr(preg_replace('/\s+/', ' ', (string)$raw), 0, 300));
+            }
+            if ($c === 429 || $c >= 500) break;
+        }
+
+        if (!$won) {
+            $line();
+            $line('>>> No shape produced an image.');
+            $line();
+            $line('    Read the provider messages above. The usual causes:');
+            $line('      * "model not found" / "unknown model"');
+            $line('           -> ai.model in assets/js/config.js names a model this');
+            $line('              provider does not serve. Pick one from the list above.');
+            $line('      * "does not support tools" / "unknown parameter"');
+            $line('           -> the model is text-only. You need one that outputs images.');
+            $line('      * every shape 404s');
+            $line('           -> this provider may not offer image generation at all.');
         }
     } else {
         $line();
@@ -530,6 +553,21 @@ function bodyResponses(string $model, string $text, ?string $refDataUrl): array 
         'model' => $model,
         'input' => [['role' => 'user', 'content' => $content]],
         'tools' => [['type' => 'image_generation']],
+    ];
+}
+
+/**
+ * Build the request body for the plain images endpoint. It takes no reference
+ * image, so the character has to be carried by the words alone — which is why
+ * the style prompt describes him in full rather than relying on the artwork.
+ */
+function bodyImages(string $model, string $text): array {
+    return [
+        'model' => $model,
+        'prompt' => $text,
+        'n' => 1,
+        'size' => '1024x1024',
+        'response_format' => 'b64_json',
     ];
 }
 
@@ -637,8 +675,10 @@ $hits[] = $now;
 
 // ── build the request ─────────────────────────────────────────────────────
 $style = "You are illustrating official artwork for the \$ROBIN (Robin Nakamoto) memecoin.\n\n"
-    . "The attached image is the canonical character: a Shiba Inu wearing a bright green\n"
-    . "Robin Hood hat with a white feather and thick black rectangular glasses.\n\n"
+    . "THE CHARACTER: a cartoon Shiba Inu with cream and tan fur, wearing a bright green\n"
+    . "Robin Hood hat with an upturned brim and a single white feather, and thick black\n"
+    . "rectangular glasses. Friendly, slightly smug expression. If a reference image is\n"
+    . "attached, match it exactly; otherwise draw him from this description.\n\n"
     . "Draw a NEW square image of this exact character in the scene the user describes.\n"
     . "Rules:\n"
     . "- Keep the character on-model: same shiba, same green feathered hat, same black glasses.\n"
@@ -666,50 +706,76 @@ $model = (string)($body['model'] ?? '') ?: MODEL;
  * Returns [httpCode, decodedJson, rawBody, curlError].
  */
 function attempt(array $ep, string $key, string $model, string $style, ?string $ref): array {
-    if ($ep['shape'] === 'chat') {
-        return post($ep['root'] . PATH_CHAT, $key, bodyChat($model, $style, $ref),
-                    TIMEOUT, $ep['auth']);
+    switch ($ep['shape']) {
+        case 'chat':
+            return post($ep['root'] . PATH_CHAT, $key, bodyChat($model, $style, $ref),
+                        TIMEOUT, $ep['auth']);
+        case 'images':
+            return post($ep['root'] . PATH_IMAGES, $key, bodyImages($model, $style),
+                        TIMEOUT, $ep['auth']);
+        default:
+            return post($ep['root'] . PATH_RESPONSES, $key, bodyResponses($model, $style, $ref),
+                        TIMEOUT, $ep['auth']);
     }
-    return post($ep['root'] . PATH_RESPONSES, $key, bodyResponses($model, $style, $ref),
-                TIMEOUT, $ep['auth']);
+}
+
+/** Every shape, starting with the one we believe in. */
+function shapeOrder(string $first): array {
+    $all = ['responses', 'chat', 'images'];
+    return array_values(array_unique(array_merge([$first], $all)));
 }
 
 $ep = endpoint($key);
-[$code, $j, $rawBody, $cerr] = attempt($ep, $key, $model, $style, $ref);
 
-/* A cached combination can go stale, and a first guess can simply be wrong.
-   Either shows up as a refusal, so rediscover once and try again rather than
-   handing the visitor an error that only the owner can act on. */
-if ($rawBody !== false && in_array($code, [401, 403, 404, 405], true)) {
-    $fresh = endpoint($key, true);
-    if ($fresh !== $ep) {
-        $ep = $fresh;
-        [$code, $j, $rawBody, $cerr] = attempt($ep, $key, $model, $style, $ref);
+/*
+ * Providers disagree about how to ask for a picture, and a wrong guess comes
+ * back as a 400 just as readily as a 404 — "unknown parameter", "this model
+ * does not support tools", "no such route". So try each shape in turn and keep
+ * the first that works, remembering it for next time.
+ *
+ * Every rejection is kept, because the provider's own wording is the only
+ * thing that actually explains a failure, and it is what the owner needs to
+ * see when none of them work.
+ */
+$attempts = [];
+$code = 0; $j = null; $rawBody = ''; $cerr = '';
+
+foreach (shapeOrder($ep['shape']) as $shape) {
+    $try = array_merge($ep, ['shape' => $shape]);
+    [$code, $j, $rawBody, $cerr] = attempt($try, $key, $model, $style, $ref);
+
+    if ($rawBody === false) break;                     // network, not shape
+
+    if ($code === 200 && extractImage(is_array($j) ? $j : [])) {
+        $ep = $try;
+        discoSave($ep);                                // this one works; remember it
+        break;
     }
-    // Still refused, and the other shape is untried? It costs one more call.
-    if ($rawBody !== false && in_array($code, [404, 405], true)) {
-        $ep['shape'] = $ep['shape'] === 'chat' ? 'responses' : 'chat';
-        [$code, $j, $rawBody, $cerr] = attempt($ep, $key, $model, $style, $ref);
-        if ($code === 200) discoSave($ep);
-    }
+
+    $why = $j['error']['message'] ?? $j['message'] ?? ('HTTP ' . $code);
+    $attempts[] = $shape . ': ' . $code . ' ' . substr((string)$why, 0, 160);
+    error_log('[robin-forge] ' . $shape . ' -> ' . $code . ' ' . $why);
+
+    // A 429 or 5xx is about load, not shape — no point trying the others.
+    if ($code === 429 || $code >= 500) break;
 }
 
 if ($rawBody === false) fail(502, 'Could not reach the image service: ' . $cerr);
 
 if ($code !== 200) {
-    $m = $j['error']['message'] ?? $j['message'] ?? 'Upstream error';
-    error_log('[robin-forge] ' . json_encode($ep) . ' HTTP ' . $code . ': ' . $m);
+    if ($code === 429) fail(429, 'The image service is rate-limiting us. Try again shortly.');
     if ($code === 401 || $code === 403) {
         fail(502, 'The image service refused the request. (Owner: run '
-                . 'api/ai.php?selftest=1&probe=1 — it prints the provider\'s own '
-                . 'error for every root, auth header and endpoint shape.)');
+                . 'api/ai.php?selftest=1&probe=1.)');
     }
-    if ($code === 429) fail(429, 'The image service is rate-limiting us. Try again shortly.');
-    if ($code === 404 || $code === 405) {
-        fail(502, 'No image endpoint found. (Owner: run api/ai.php?selftest=1&probe=1 '
-                . 'and set API_ROOT from what it reports.)');
-    }
-    fail(502, 'The image service is busy. Try again in a moment.');
+    if ($code >= 500) fail(502, 'The image service is having trouble. Try again in a moment.');
+
+    /* A 4xx here is a configuration problem — a model that cannot draw, an
+       unsupported parameter, a name the provider does not know. Those messages
+       name the fix, so pass them through rather than hiding them behind
+       something vague. They describe our own request, not anyone's data. */
+    fail(502, 'Image generation was rejected. The provider said — ' .
+              implode(' | ', $attempts));
 }
 
 // ── pull the image out of the response ────────────────────────────────────

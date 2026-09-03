@@ -326,35 +326,46 @@ limit, so you always see how far it got. It tells three failures apart:
   provider's docs and set `API_ROOT`, or set the `ROBIN_AI_ROOTS` environment
   variable (comma separated) to have discovery try yours first — no code change.
 
-### Two API shapes
+### Three ways to ask for a picture
 
-Providers implement one of two conventions, and the site speaks both:
+Providers disagree about this, so the site tries all three and keeps whichever
+works:
 
-- **`responses`** — `POST /responses` with an `input` array and
-  `tools: [{type: "image_generation"}]`. This is what a **"Create response"**
-  endpoint in the docs means. The picture comes back as an
-  `image_generation_call` with base64 in `result`.
-- **`chat`** — `POST /chat/completions` with `messages` and
-  `modalities: ["image","text"]`, the OpenRouter convention. The picture comes
-  back on `message.images[]`.
+| Shape | Request | Image comes back as |
+|---|---|---|
+| `responses` | `POST /responses`, `input` + `tools:[{image_generation}]` | `image_generation_call.result` |
+| `chat` | `POST /chat/completions`, `messages` + `modalities` | `message.images[]` |
+| `images` | `POST /images/generations`, `prompt` | `data[0].b64_json` |
 
-`API_SHAPE` defaults to `auto`: it tries `responses` first and falls back to
-`chat` only if that path is genuinely absent (404/405), so a wrong guess costs
-one wasted round trip rather than failing outright. Pin it once you know.
+A wrong guess comes back as a **400** just as often as a 404 — *"model does not
+support the tools parameter"*, *"unknown parameter"* — so a 400 moves the search
+on exactly like a missing route does. Only a 429 or a 5xx stops it, because
+those are about load rather than shape.
 
-**The right model depends on the shape.** Under `responses` the image comes
-from the tool, so `ai.model` should be a capable general model. Under `chat` it
-must be a model that outputs images. The self-test lists what your key can
-reach.
+`responses` and `chat` attach your artwork as a reference image so the dog stays
+on-model. `images` cannot take one, so the style prompt describes the character
+in full — green feathered Robin Hood hat, black rectangular glasses, cream and
+tan fur — and gets close from words alone.
 
-### Picking a model
+### When it still will not draw
 
-`ai.model` in `config.js` must name a model that **accepts an input image and
-returns an image**. The default is `google/gemini-2.5-flash-image`. The self-test
-above lists what your key can actually reach — use that rather than guessing.
+The error now carries **the provider's own words**, because those name the fix
+and nothing else does:
 
-`API_ROOT` at the top of `api/ai.php` (and `api/ai.js`) is the provider's API
-root with no endpoint path. Change it there if your docs show a different one.
+> Image generation was rejected. The provider said — responses: 400 model does
+> not support the tools parameter | chat: 404 no such route | images: 400
+> unknown model
+
+Read it, then:
+
+- **"model not found"** → `ai.model` in `assets/js/config.js` names something
+  your provider does not serve. The self-test lists what your key can reach.
+- **"does not support tools"** / **"unknown parameter"** → that model is
+  text-only. You need one that outputs images.
+- **every shape 404s** → this provider may not offer image generation at all,
+  in which case no configuration will help.
+
+`api/ai.php?selftest=1&image=1` walks all three and prints each response in full.
 
 ### Cost control
 
