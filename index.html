@@ -197,7 +197,7 @@
           </div>
           <div class="leg-row">
             <input id="amtIn" type="number" inputmode="decimal" placeholder="0.0" min="0" step="any" aria-label="Amount to pay">
-            <span class="coin"><span class="ico" id="icoFrom"></span><span id="symFrom">ETH</span></span>
+            <button class="coin" id="coinFrom" type="button" aria-label="Choose the token to pay with"><span class="ico" id="icoFrom"></span><span id="symFrom">ETH</span><svg class="coin-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
           </div>
           <div class="leg-fiat" id="fiatIn"></div>
         </div>
@@ -215,7 +215,7 @@
           </div>
           <div class="leg-row">
             <input id="amtOut" type="text" placeholder="0.0" readonly aria-label="Amount received (estimated)">
-            <span class="coin"><span class="ico" id="icoTo"></span><span id="symTo">ROBIN</span></span>
+            <button class="coin" id="coinTo" type="button" aria-label="Choose the token to receive"><span class="ico" id="icoTo"></span><span id="symTo">ROBIN</span><svg class="coin-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
           </div>
           <div class="leg-fiat" id="fiatOut"></div>
         </div>
@@ -226,11 +226,13 @@
           <div class="row"><span>Rate</span><b id="mRate">—</b></div>
           <div class="row"><span>Minimum received</span><b id="mMin">—</b></div>
           <div class="row"><span>Pool fee <span style="opacity:.6">(creator + protocol)</span></span><b id="mFee">—</b></div>
+          <div class="row" id="rowRobinFee" hidden><span>Robin fee</span><b id="mRobinFee">—</b></div>
           <div class="row"><span>Network</span><b>Robinhood Chain · ETH gas</b></div>
           <div class="row"><span>Slippage</span><span class="slip" id="slip"></span></div>
         </div>
 
         <button class="btn btn-lime btn-lg btn-block swap-cta" id="swapBtn" type="button">Connect wallet</button>
+        <p class="swap-fund" id="swapFund" hidden></p>
         <div class="swap-note" id="swapNote">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
           <span>Quotes come from the live Uniswap V4 pool. Confirm every transaction in your own wallet — this site never holds your keys.</span>
@@ -239,6 +241,20 @@
     </div>
   </div>
 </section>
+
+<!-- the token picker, shared by both legs of the swap -->
+<div class="tokpick" id="tokPick" hidden>
+  <div class="tokpick-bg" id="tokPickBg"></div>
+  <div class="tokpick-sheet" role="dialog" aria-modal="true" aria-label="Choose a token">
+    <div class="tokpick-head">
+      <input id="tokSearch" type="search" autocomplete="off" spellcheck="false"
+             placeholder="Search name, symbol or address" aria-label="Search tokens">
+      <button class="tokpick-x" id="tokPickX" type="button" aria-label="Close">&times;</button>
+    </div>
+    <ul class="tokpick-list" id="tokList"></ul>
+    <p class="tokpick-note" id="tokNote">Every token on Robinhood Chain with a live market, deepest first.</p>
+  </div>
+</div>
 
 <!-- ═════════════════════════════════════════════════════════ buy feed ── -->
 <section class="sec dark" id="feed" style="padding-top:0">
@@ -529,6 +545,7 @@
 <script src="assets/js/market.js"></script>
 <script src="assets/js/wallet.js"></script>
 <script src="assets/js/swap.js"></script>
+<script src="assets/js/exchange.js"></script>
 <script src="assets/js/feed.js"></script>
 <script src="assets/js/arena.js"></script>
 <script src="assets/js/doge.js"></script>

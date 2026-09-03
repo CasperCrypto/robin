@@ -74,6 +74,9 @@
 
   /** Is on-page V4 execution actually safe to attempt right now? */
   function v4Ready() {
+    // The verified pool key describes one pool. Any other token has to hand
+    // off, whatever the config says.
+    if (!isHome()) return false;
     return C.swap.mode === 'v4' &&
            /^0x[0-9a-fA-F]{40}$/.test(C.swap.universalRouter || '') &&
            /^0x[0-9a-fA-F]{40}$/.test(C.swap.permit2 || '') &&
@@ -143,10 +146,22 @@
     btn: $('#swapBtn'), note: $('#swapNote'),
     dot: $('#netDot'), label: $('#netLabel'),
     slip: $('#slip'), presets: $('#presets'), fee: $('#mFee'),
+    robinFee: $('#mRobinFee'), robinFeeRow: $('#rowRobinFee'),
     flip: $('#flipBtn'), max: $('#maxBtn')
   };
 
-  var S = { dir: 'buy', slippage: C.swap.slippageDefault || 5, busy: false, bal: {} };
+  /* `tok` is whichever token this panel is trading against ETH. It starts as
+     the site's own and changes when the picker fires robin:token, so every
+     price, label and quote below reads from here rather than from config. */
+  var S = {
+    dir: 'buy', slippage: C.swap.slippageDefault || 5, busy: false, bal: {},
+    tok: { address: C.token.address, symbol: C.token.symbol, name: C.token.name,
+           decimals: C.token.decimals, home: true },
+  };
+  function isHome() {
+    // Guarded: v4Ready() is declared above S and could be reached first.
+    return !!S && !!S.tok && S.tok.address.toLowerCase() === C.token.address.toLowerCase();
+  }
 
   var ICON_ETH = '<svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="12" r="12" fill="#627eea"/><path d="M12 3.5v6.3l5.2 2.3z" fill="#fff" fill-opacity=".6"/><path d="M12 3.5L6.8 12.1 12 9.8z" fill="#fff"/><path d="M12 16.1v4.4l5.2-7.2z" fill="#fff" fill-opacity=".6"/><path d="M12 20.5v-4.4l-5.2-2.8z" fill="#fff"/><path d="M12 15.1l5.2-3-5.2-2.3z" fill="#fff" fill-opacity=".2"/><path d="M6.8 12.1l5.2 3V9.8z" fill="#fff" fill-opacity=".6"/></svg>';
   var ICON_ROBIN = '<img src="assets/img/robin-logo-128.png" width="26" height="26" alt="" ' +
@@ -159,23 +174,53 @@
   }
 
   /* -------------------------------------------------------------- pricing */
-  /** ETH per ROBIN and USD per ETH, derived from the live pair. */
+  /**
+   * ETH per token and USD per ETH.
+   *
+   * The site's own token has a live feed already polling; anything picked from
+   * the list carries its own numbers from the token endpoint. Both end up in
+   * the same shape so nothing downstream has to know which it got.
+   */
   function prices() {
-    var m = RB.market.state;
-    if (!m.pair || !m.priceNative) return null;
-    var base = (m.pair.baseToken && m.pair.baseToken.address || '').toLowerCase();
-    var isBase = base === C.token.address.toLowerCase();
-    var ethPerRobin = isBase ? m.priceNative : (m.priceNative ? 1 / m.priceNative : null);
-    if (!ethPerRobin) return null;
-    var usdPerRobin = m.priceUsd;
-    var usdPerEth = usdPerRobin && ethPerRobin ? usdPerRobin / ethPerRobin : null;
-    return { ethPerRobin: ethPerRobin, usdPerRobin: usdPerRobin, usdPerEth: usdPerEth };
+    if (isHome()) {
+      var m = RB.market.state;
+      if (!m.pair || !m.priceNative) return null;
+      var base = (m.pair.baseToken && m.pair.baseToken.address || '').toLowerCase();
+      var isBase = base === C.token.address.toLowerCase();
+      var ethPerRobin = isBase ? m.priceNative : (m.priceNative ? 1 / m.priceNative : null);
+      if (!ethPerRobin) return null;
+      var usdPerRobin = m.priceUsd;
+      return { ethPerRobin: ethPerRobin, usdPerRobin: usdPerRobin,
+               usdPerEth: usdPerRobin && ethPerRobin ? usdPerRobin / ethPerRobin : null };
+    }
+    var t = S.tok;
+    if (!t.priceNative) return null;
+    return { ethPerRobin: t.priceNative, usdPerRobin: t.priceUsd || null,
+             usdPerEth: t.priceUsd && t.priceNative ? t.priceUsd / t.priceNative : null };
   }
 
-  /** Fee the pool's hook takes, as a multiplier on the output. */
+  /** The pool's own fee, as a percentage. Only the site's token is taxed. */
+  function poolFeePct() {
+    return isHome() ? (Number(C.swap.feePct) || 0) : 0;
+  }
+
+  /**
+   * What this site takes, as a percentage.
+   *
+   * It is subtracted from the quote rather than added on afterwards, so the
+   * number the panel promises is the number that arrives. A fee a trader only
+   * discovers in their wallet is the kind of thing that loses you the trader.
+   */
+  function robinFeePct() {
+    var f = Number(C.swap.robinFeePct) || 0;
+    if (!C.swap.feeRecipient) return 0;      // nowhere to send it, so don't charge it
+    return Math.min(Math.max(f, 0), 3);      // capped here as well as on chain
+  }
+
+  /** Everything taken out of the output, as a multiplier. */
   function feeMult() {
-    var f = Number(C.swap.feePct) || 0;
-    return 1 - Math.min(Math.max(f, 0), 50) / 100;
+    var total = Math.min(poolFeePct() + robinFeePct(), 50);
+    return 1 - total / 100;
   }
 
   /**
@@ -196,8 +241,9 @@
   /* --------------------------------------------------------------- render */
   function render() {
     var buy = S.dir === 'buy';
-    el.symFrom.textContent = buy ? 'ETH' : 'ROBIN';
-    el.symTo.textContent   = buy ? 'ROBIN' : 'ETH';
+    var sym = S.tok.symbol || '???';
+    el.symFrom.textContent = buy ? 'ETH' : sym;
+    el.symTo.textContent   = buy ? sym : 'ETH';
     el.icoFrom.innerHTML   = buy ? ICON_ETH : ICON_ROBIN;
     el.icoTo.innerHTML     = buy ? ICON_ROBIN : ICON_ETH;
 
@@ -221,22 +267,30 @@
     // rate + minimum received
     if (p) {
       el.rate.textContent = buy
-        ? '1 ETH ≈ ' + RB.num(1 / p.ethPerRobin) + ' ROBIN'
-        : '1 ROBIN ≈ ' + RB.usd(p.usdPerRobin);
+        ? '1 ETH ≈ ' + RB.num(1 / p.ethPerRobin) + ' ' + sym
+        : '1 ' + sym + ' ≈ ' + (p.usdPerRobin ? RB.usd(p.usdPerRobin) : RB.num(p.ethPerRobin, 8) + ' ETH');
     } else { el.rate.textContent = '—'; }
 
     el.min.textContent = out
-      ? RB.num(out * (1 - S.slippage / 100), 4) + ' ' + (buy ? 'ROBIN' : 'ETH')
+      ? RB.num(out * (1 - S.slippage / 100), 4) + ' ' + (buy ? sym : 'ETH')
       : '—';
 
     if (el.fee) {
-      var f = Number(C.swap.feePct) || 0;
+      var f = poolFeePct();
       el.fee.textContent = f ? f + '%' : 'None';
+    }
+    // Our own cut is a separate line, and only appears when there is one.
+    if (el.robinFeeRow) {
+      var rf = robinFeePct();
+      el.robinFeeRow.hidden = !rf;
+      if (rf && el.robinFee) el.robinFee.textContent = rf + '%';
     }
 
     // balances
     var bE = S.bal.eth != null ? RB.fromUnits(S.bal.eth, 18) : null;
-    var bR = S.bal.robin != null ? RB.fromUnits(S.bal.robin, C.token.decimals) : null;
+    // Balances are only read for the site's own token; anything else shows a
+    // dash rather than a number we did not actually fetch.
+    var bR = (isHome() && S.bal.robin != null) ? RB.fromUnits(S.bal.robin, C.token.decimals) : null;
     el.balFrom.textContent = buy ? (bE != null ? RB.num(bE, 5) : '—') : (bR != null ? RB.num(bR) : '—');
     el.balTo.textContent   = buy ? (bR != null ? RB.num(bR) : '—') : (bE != null ? RB.num(bE, 5) : '—');
 
@@ -253,10 +307,41 @@
     if (!amtIn || amtIn <= 0) { b.textContent = 'Enter an amount'; b.setAttribute('aria-disabled', 'true'); return; }
 
     var have = S.dir === 'buy' ? bE : bR;
-    var sym = S.dir === 'buy' ? 'ETH' : 'ROBIN';
+    var tsym = S.tok.symbol || 'token';
+    var sym = S.dir === 'buy' ? 'ETH' : tsym;
     if (have != null && amtIn > have) { b.textContent = 'Insufficient ' + sym; b.setAttribute('aria-disabled', 'true'); return; }
 
-    b.textContent = S.dir === 'buy' ? 'Buy $ROBIN' : 'Sell $ROBIN';
+    b.textContent = (S.dir === 'buy' ? 'Buy $' : 'Sell $') + tsym;
+  }
+
+  /* The picker chose a token. Adopt it, and drop back to handing off unless it
+     is the one whose pool key was verified — an on-page swap routed at the
+     wrong pool would be a real loss, and a picker that silently changed which
+     pool the router points at is exactly how that happens. */
+  document.addEventListener('robin:token', function (e) {
+    var t = e.detail && e.detail.token;
+    if (!t) return;
+    S.tok = {
+      address: t.address, symbol: t.symbol || '???', name: t.name,
+      decimals: t.decimals == null ? 18 : t.decimals,
+      priceUsd: t.priceUsd, priceNative: t.priceNative,
+      home: t.address.toLowerCase() === C.token.address.toLowerCase(),
+    };
+    // Picking on one leg implies the direction of the trade.
+    if (e.detail.side === 'from') S.dir = 'sell';
+    if (e.detail.side === 'to') S.dir = 'buy';
+    el.icoFrom.innerHTML = S.dir === 'buy' ? ICON_ETH : tokenIcon();
+    el.icoTo.innerHTML   = S.dir === 'buy' ? tokenIcon() : ICON_ETH;
+    if (!isHome()) S.bal.robin = null;
+    render();
+    refreshBalances(true);
+  });
+
+  /* The site's own token has artwork; everything else gets its initial. */
+  function tokenIcon() {
+    if (isHome()) return ICON_ROBIN;
+    var sym = (S.tok.symbol || '?').slice(0, 3).toUpperCase();
+    return '<span class="ico-gen">' + RB.esc(sym) + '</span>';
   }
 
   function paintNet() {
@@ -280,7 +365,9 @@
 
   el.max.addEventListener('click', function () {
     var bE = S.bal.eth != null ? RB.fromUnits(S.bal.eth, 18) : null;
-    var bR = S.bal.robin != null ? RB.fromUnits(S.bal.robin, C.token.decimals) : null;
+    // Balances are only read for the site's own token; anything else shows a
+    // dash rather than a number we did not actually fetch.
+    var bR = (isHome() && S.bal.robin != null) ? RB.fromUnits(S.bal.robin, C.token.decimals) : null;
     if (S.dir === 'buy') {
       if (bE == null) return;
       el.amtIn.value = Math.max(0, bE - 0.0005).toFixed(6);   // leave a little for gas
@@ -327,8 +414,8 @@
     var base = C.links.uniswap || 'https://app.uniswap.org/swap';
     var q = [
       'chain=' + encodeURIComponent(C.links.uniswapChainSlug || 'robinhood'),
-      'inputCurrency=' + (S.dir === 'buy' ? 'ETH' : C.token.address),
-      'outputCurrency=' + (S.dir === 'buy' ? C.token.address : 'ETH')
+      'inputCurrency=' + (S.dir === 'buy' ? 'ETH' : S.tok.address),
+      'outputCurrency=' + (S.dir === 'buy' ? S.tok.address : 'ETH')
     ];
     if (amount > 0) { q.push('exactAmount=' + amount, 'exactField=input'); }
     return base + (base.indexOf('?') > -1 ? '&' : '?') + q.join('&');
@@ -356,7 +443,7 @@
       var url = handoffUrl(amtIn);
       window.open(url, '_blank', 'noopener');
       note('Opened Uniswap with your amount pre-filled. Check the token address matches ' +
-           '<code>' + RB.shortAddr(C.token.address) + '</code> before you confirm.', 'ok');
+           '<code>' + RB.shortAddr(S.tok.address) + '</code> before you confirm.', 'ok');
     }
   });
 

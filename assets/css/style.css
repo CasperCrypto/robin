@@ -1216,6 +1216,113 @@ body.bar-up .buypop-wrap{transform:translate3d(0,-62px,0)}
   .buypop{width:320px}
 }
 
+/* ══════════════════════════════════════════════════════ the token picker */
+/* Each leg's coin badge is a button now, so it has to read as one. */
+.coin{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;
+      transition:transform .14s var(--ease),background .16s}
+.coin:active{transform:scale(.96)}
+.coin-caret{width:14px;height:14px;flex:none;opacity:.5;margin-left:-2px}
+@media (hover:hover) and (pointer:fine){
+  .coin:hover{background:var(--gd-fill-hi)}
+  .coin:hover .coin-caret{opacity:.9}
+}
+/* Anything without artwork gets its ticker instead. */
+.ico-gen{
+  width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  font-size:9px;font-weight:800;letter-spacing:.02em;
+  background:var(--gd-fill-hi);border:1px solid var(--gd-rim);color:var(--text-inv-soft);
+}
+
+.tokpick{position:fixed;inset:0;z-index:200}
+.tokpick-bg{
+  position:absolute;inset:0;background:rgba(4,7,2,.66);
+  opacity:0;transition:opacity .22s var(--ease);
+}
+.tokpick.in .tokpick-bg{opacity:1}
+.tokpick-sheet{
+  position:absolute;left:0;right:0;bottom:0;
+  display:flex;flex-direction:column;max-height:82vh;
+  /* Fully opaque: at 99% the page behind it showed through the token rows. */
+  background:linear-gradient(180deg,#1a220e,#080b05);
+  border-top:1px solid var(--gd-rim);
+  border-radius:var(--r-2xl) var(--r-2xl) 0 0;
+  padding:14px 14px calc(14px + env(safe-area-inset-bottom));
+  box-shadow:0 -24px 60px -20px rgba(0,0,0,.9);
+  transform:translate3d(0,100%,0);
+  transition:transform .3s var(--ease-out);
+}
+.tokpick.in .tokpick-sheet{transform:none}
+
+.tokpick-head{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+.tokpick-head input{
+  flex:1;padding:13px 14px;border-radius:13px;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);color:var(--text-inv);
+  font-size:14px;
+}
+.tokpick-head input:focus{outline:none;border-color:rgba(168,220,43,.55);background:var(--gd-fill-hi)}
+.tokpick-head input::placeholder{color:rgba(244,255,227,.30)}
+.tokpick-x{
+  flex:none;width:38px;height:38px;border-radius:50%;font-size:22px;line-height:1;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);color:var(--text-inv-soft);
+}
+
+.tokpick-list{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.tokpick-list button{
+  width:100%;display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;
+  align-items:center;text-align:left;
+  padding:11px 12px;border-radius:13px;background:transparent;border:0;
+  transition:background .14s;
+}
+.tokpick-list button:active{background:var(--gd-fill-hi)}
+.tok-sym{
+  grid-column:1;grid-row:1;display:flex;align-items:center;gap:6px;
+  font-family:var(--font-display);font-size:15px;color:var(--text-inv);
+}
+.tok-home{
+  font-style:normal;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 6px;border-radius:999px;background:rgba(168,220,43,.18);color:var(--lime-300);
+}
+.tok-name{
+  grid-column:1;grid-row:2;font-size:11.5px;color:var(--text-inv-mute);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.tok-num{
+  grid-column:3;grid-row:1;display:flex;align-items:baseline;gap:6px;justify-self:end;
+  font-variant-numeric:tabular-nums;
+}
+.tok-num b{font-family:var(--font-display);font-size:14px;color:var(--text-inv)}
+.tok-num em{font-style:normal;font-size:11px}
+.tok-num em.up{color:var(--up)}
+.tok-num em.down{color:var(--down)}
+.tok-liq{
+  grid-column:3;grid-row:2;justify-self:end;
+  font-size:11px;color:var(--text-inv-mute);font-variant-numeric:tabular-nums;
+}
+.tok-empty{padding:22px 12px;text-align:center;font-size:13px;color:var(--text-inv-mute)}
+.tok-skel{
+  height:52px;margin-bottom:6px;border-radius:13px;
+  background:linear-gradient(90deg,var(--gd-fill),var(--gd-fill-hi),var(--gd-fill));
+  background-size:400% 100%;animation:shimmer 1.4s ease infinite;
+}
+.tokpick-note{margin:10px 2px 0;font-size:11.5px;color:var(--text-inv-mute)}
+
+.swap-fund{
+  margin:10px 0 0;padding:11px 13px;border-radius:12px;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);
+  font-size:12.5px;line-height:1.5;color:var(--text-inv-mute);
+}
+.swap-fund.ok{border-color:rgba(61,220,132,.32);color:var(--text-inv-soft)}
+
+@media (min-width:560px){
+  .tokpick-sheet{
+    left:50%;bottom:auto;top:50%;right:auto;width:min(440px,92vw);
+    border-radius:var(--r-2xl);border:1px solid var(--gd-rim);
+    transform:translate3d(-50%,-46%,0) scale(.96);opacity:0;
+    transition:transform .28s var(--ease-out),opacity .2s var(--ease-out);
+  }
+  .tokpick.in .tokpick-sheet{transform:translate3d(-50%,-50%,0) scale(1);opacity:1}
+}
+
 /* ═════════════════════════════════════════════════════════════ the room */
 /*
    A head count and six emoji, pinned to the right edge. The rail is the only

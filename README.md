@@ -24,6 +24,8 @@ public_html/robin/
 └── api/
     ├── arena.php     ← the Arena round engine
     ├── room.php      ← live presence and reactions
+    ├── tokens.php    ← every tradable token on the chain
+    ├── bridge.php    ← does anything bridge in yet?
     ├── data/         ← the arena's database (created on first use)
     ├── scan.php      ← token scanner (no UI; still answers)
     ├── provider.php  ← your AI provider connection
@@ -129,6 +131,8 @@ links.*          // X, Telegram, DexScreener, Pons. Leave '' and the link is
 twitterHandle    // handle only, no @, for the live timeline
 supplyFacts      // the tokenomics tiles
 swap.feePct      // total fee the Pons hook takes per swap (see below)
+swap.robinFeePct // what this site takes; inert until feeRecipient is set
+swap.feeRecipient// where your cut goes — blank means no fee is charged
 arena.pollMs     // how often the arena refreshes (round length is server-side)
 room.pollMs      // presence cadence at rest; it halves while the room is busy
 ```
@@ -241,6 +245,63 @@ blocked by many privacy extensions and render nothing at all for a protected
 account. A follow card sits alongside them, and takes over entirely if X never
 loads. To change which posts appear, paste the numeric id from the end of a post
 URL into `tweets`, newest first.
+
+---
+
+## The exchange (every token on the chain)
+
+The swap panel knew about one token. Now both legs are a picker, and the picker
+lists every token on Robinhood Chain that has a live market — the difference
+between a buy button and an exchange.
+
+`api/tokens.php` builds that list from two sources, because neither is enough
+alone: the explorer knows every token that exists but nothing about price,
+DexScreener knows price and liquidity but only for what is trading. A token
+with no pair is dropped rather than listed, since offering a trade that cannot
+happen is worse than not offering it. Prices are fetched in batches — a hundred
+tokens one at a time is a hundred round trips and a page nobody waits for.
+
+**On-page execution stays pinned to one pool.** The verified pool key in
+`config.js` describes exactly one market, so anything picked from the list
+hands off to Uniswap instead of routing through the V4 path, whatever
+`swap.mode` says. Routing a trade at the wrong pool is a real loss, and a
+picker that silently changed which pool the router points at is precisely how
+that happens.
+
+### Taking a fee
+
+`swap.robinFeePct` is what this site takes, on top of the pool's own fee. Two
+rules it follows:
+
+- **It is subtracted from the quote, never added afterwards.** The number the
+  panel promises is the number that arrives. A fee a trader only discovers in
+  their wallet is how you lose the trader.
+- **Nothing is charged until `swap.feeRecipient` is set.** An uncollectable fee
+  is just a worse price. It is capped at 3%.
+
+### Bridging in — asked, not assumed
+
+Buying here needs ETH on Robinhood Chain, which a newcomer will not have, and
+whether any aggregator bridges into chain 4663 is not something to hard-code:
+it is false until one day it is true.
+
+So `api/bridge.php` asks. It queries LI.FI, Relay, Squid and Rango for their
+own chain lists, caches the answer for a day, and reports one of three things —
+and the difference between the last two is the point:
+
+| | what the page says |
+|---|---|
+| `available` | names the aggregator and offers the direct route |
+| `none` | says plainly that nobody bridges in yet, and points at the official bridge |
+| `unknown` | says nothing, because nobody answered and we learned nothing |
+
+An "unknown" is an outage, not a finding, so it is never cached. The day an
+aggregator lists the chain, the cross-chain route appears on its own with no
+code change. Adding an aggregator is adding a row to `providers()`.
+
+Every one of those aggregators supports an integrator fee on the route, which
+is how a cross-chain buy would earn: quoted to the user by the aggregator,
+before they commit, in the same number they are agreeing to.
 
 ---
 
@@ -461,6 +522,8 @@ What each one is for:
 | `discovery.test.sh` | Finds a provider whose root, auth header and request shape all differ from the defaults; a 400 advances the search, a 5xx is retried once |
 | `scan.test.sh` | The scanner's scoring against known token profiles: a clean token passes, a rug is called, and unreachable sources produce "could not check" rather than an accusation |
 | `arena.test.sh` | The jackpot engine on a controlled clock: allowances by tier, the daily limit, staking rules, resolution, points conservation, a one-player round returned — and an independent reimplementation of the fairness check |
+| `market.test.sh` | The token list against a known chain, and the bridge probe's three answers kept distinct — including that silence is never mistaken for a no |
+| `exchange.test.js` | The picker in a browser: the chain listed deepest-first, search by name and address, the panel re-quoting for whatever is chosen, and a picked token refusing to route on-page |
 | `room.test.js` | Two browsers at once: a head count that rises, a reaction crossing from one to the other, arbitrary content refused, and a hidden tab that stops polling |
 | `arena-ui.test.js` | The arena in a browser against the real PHP — claiming, staking, the wheel matching the recorded entries, and over-staking refused by the server |
 | `motion.test.js` | Animations still run under `prefers-reduced-motion` (Android battery saver sets it), and the glass panels are static except when one arrives |

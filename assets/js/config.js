@@ -104,12 +104,32 @@ window.ROBIN = {
      * slippage tolerance would revert. Set it to 0 for an untaxed token. */
     feePct: 4,
 
+    /* What this site takes on each swap, as a percentage, on top of the pool's
+     * own fee. It is subtracted from the quote rather than added afterwards,
+     * so the number the panel promises is the number that arrives.
+     *
+     * Nothing is charged until feeRecipient is set — an uncollectable fee is
+     * just a worse price. Capped at 3% in the code as well as here. */
+    robinFeePct: 0.5,
+    feeRecipient: '',
+
     /* Slippage tolerance, on top of feePct. Hidden from the panel by default —
      * the quote already accounts for the pool fee, so there is nothing here a
      * visitor needs to think about. Set showSlippage true to expose the picker. */
     slippageDefault: 2,           // percent
     showSlippage: false,
     presets:        [0.01, 0.05, 0.1, 0.5]   // quick-buy amounts in ETH
+  },
+
+  /* ------------------------------------------------------------- exchange */
+  /* The token picker and the cross-chain check. Whether anything bridges into
+   * Robinhood Chain is asked of the aggregators at runtime rather than assumed
+   * here, so the day one of them lists the chain this starts working with no
+   * code change. */
+  exchange: {
+    tokensEndpoint: 'api/tokens.php',
+    bridgeEndpoint: 'api/bridge.php',
+    enabled: true
   },
 
   /* ----------------------------------------------------------------- room */

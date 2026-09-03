@@ -178,6 +178,33 @@
       return passthroughOr(url, opts, function () { return J(SAMPLE_SCAN, 1800); });
     }
 
+    if (u.indexOf('api/tokens') > -1 || u.indexOf('api/bridge') > -1) {
+      // The preview cannot reach PHP, so it shows a plausible chain rather than
+      // an empty picker — and reports the bridge as genuinely unavailable,
+      // which is the honest state today.
+      return passthroughOr(url, opts, function () {
+        if (u.indexOf('api/bridge') > -1) {
+          return J({ chainId: 4663, status: 'none', via: [],
+                     providers: { lifi: { name: 'LI.FI', reachable: true, supports: false } },
+                     checkedAt: Math.floor(Date.now() / 1000) }, 200);
+        }
+        return J({ count: 4, reached: { explorer: true, dexscreener: true }, tokens: [
+          { address: '0x280413fbf06ccc1114094a5967db2191d49ee75e', name: 'Robin Nakamoto',
+            symbol: 'ROBIN', decimals: 18, priceUsd: 0.00007012, priceNative: 0.00000002,
+            liquidity: 41800, volume24h: 18400, change24h: 12.6, holders: 412 },
+          { address: '0xaaaa13fbf06ccc1114094a5967db2191d49ee75e', name: 'Hood Cat',
+            symbol: 'HCAT', decimals: 18, priceUsd: 1.25, priceNative: 0.0003,
+            liquidity: 260000, volume24h: 91000, change24h: -3.1, holders: 900 },
+          { address: '0xcccc13fbf06ccc1114094a5967db2191d49ee75e', name: 'Feather',
+            symbol: 'FTHR', decimals: 18, priceUsd: 0.0042, priceNative: 0.0000011,
+            liquidity: 88000, volume24h: 12400, change24h: 41.2, holders: 260 },
+          { address: '0xdddd13fbf06ccc1114094a5967db2191d49ee75e', name: 'Sherwood',
+            symbol: 'SHWD', decimals: 18, priceUsd: 0.19, priceNative: 0.00005,
+            liquidity: 15600, volume24h: 3100, change24h: 2.4, holders: 74 }
+        ], updatedAt: Math.floor(Date.now() / 1000) }, 260);
+      });
+    }
+
     if (u.indexOf('api/room') > -1) {
       // A preview with no PHP still shows a room, so the rail is not a dead
       // control — but it invents a plausible crowd rather than claiming a real
