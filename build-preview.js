@@ -7,7 +7,7 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 let html = read('index.html');
 let css = read('assets/css/style.css');
-const JS = ['config.js','keccak.js','app.js','market.js','wallet.js','swap.js','feed.js','scanner.js','doge.js','buypop.js'];
+const JS = ['config.js','keccak.js','app.js','market.js','wallet.js','swap.js','feed.js','arena.js','doge.js','buypop.js'];
 
 // images -> data URIs (the preview sandbox can't load sibling files)
 const MIME = { png:'image/png', webp:'image/webp', gif:'image/gif', ico:'image/x-icon' };

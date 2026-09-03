@@ -22,7 +22,9 @@ public_html/robin/
 ├── index.html
 ├── assets/
 └── api/
-    ├── scan.php      ← Robin Scanner
+    ├── arena.php     ← the Arena round engine
+    ├── data/         ← the arena's database (created on first use)
+    ├── scan.php      ← token scanner (no UI; still answers)
     ├── provider.php  ← your AI provider connection
     ├── lib.php       ← shared HTTP + the summary prompt
     ├── rpc.php       ← chain relay, fixes an empty buy feed
@@ -126,7 +128,7 @@ links.*          // X, Telegram, DexScreener, Pons. Leave '' and the link is
 twitterHandle    // handle only, no @, for the live timeline
 supplyFacts      // the tokenomics tiles
 swap.feePct      // total fee the Pons hook takes per swap (see below)
-scanner.endpoint // where the scanner posts (api/scan.php by default)
+arena.pollMs     // how often the arena refreshes (round length is server-side)
 ```
 
 ### `swap.feePct` — read this if you changed your creator fee
@@ -227,11 +229,10 @@ nothing left worth tuning. Set `swap.showSlippage: true` to bring it back.
 doesn't have it, reads real balances, quotes from the live pool and shows minimum
 received at your slippage. See below for the two execution modes.
 
-**Robin Scanner** — the one AI feature. Paste any Robinhood Chain token address
-and get a risk report: contract verification, mint functions, owner powers,
-holder concentration, liquidity depth, pair age. Every check is computed from
-chain data; the model only writes the summary and cannot overrule a finding.
-See below.
+**Robin Arena** — five-minute rounds on the $ROBIN price. Call UP or DOWN,
+climb the board. Robin calls every round too and his record is public, so the
+hook is beating him. Entry is gated by the $ROBIN you hold — nobody deposits
+anything and nothing is at risk. See below.
 
 **Community** — the three posts named in `config.tweets` are embedded
 individually, which is far more reliable than a timeline widget: timelines are
@@ -242,63 +243,90 @@ URL into `tweets`, newest first.
 
 ---
 
-## Robin Scanner (the AI feature)
+## Robin Arena (the game)
 
-Paste any Robinhood Chain token address and the site reports what could go wrong
-with it: whether the contract is verified, whether more tokens can be minted,
-whether the owner can pause trading or change the tax, how much of the supply
-sits in a handful of wallets, and whether the pool is deep enough to sell into.
+Back-to-back five-minute rounds on the $ROBIN price. While one round runs,
+entry is open for the next, so there is always something to watch and something
+to pick. Call UP or DOWN; everyone who got it right moves up the board.
 
-**The important design decision: the checks are computed, not asked of a model.**
-Holder concentration is arithmetic over the explorer's holder list. "Can this be
-minted?" is a match against the verified source. Liquidity depth is a ratio.
-`api/scan.php` works all of it out and reaches the verdict on its own. Only then
-is a language model handed the finished findings and asked to write the
-paragraph at the top — and told, in the prompt, that it cannot overturn them.
+**Robin plays every round.** One model call per round — he reads the price and
+the last few moves, picks a side, and talks trash about it before the round
+locks. His record is public and permanent, so the hook is *beating Robin*
+rather than predicting a chart. That is also the entire AI budget for the
+feature: about 288 calls a day, and if the call fails he sits the round out
+rather than having a pick invented for him.
 
-That ordering is the whole point. A model asked *"is this a rug?"* will produce a
-confident answer out of nothing. A model handed *"the top ten wallets hold 87% of
-supply"* can only explain it.
+### Nobody deposits anything
 
-**It never guesses when it cannot look.** If the explorer or the market data
-source does not answer, the affected findings are marked `unknown`, the verdict
-becomes *"Could not check"*, and nothing is cached. Reporting "high risk"
-because a fetch failed would be a lie with someone's money attached; reporting
-"looks fine" would be worse.
+Entry is gated by the $ROBIN a wallet already **holds**, checked server-side
+with `balanceOf`. There is no pot, no custody, and no private key anywhere near
+the server — which is the only responsible answer while the site runs on shared
+hosting. A bigger bag scores faster, and farming the leaderboard with fake
+wallets costs real money per wallet, so the token still does the work.
 
-Verdicts, in order of severity: `high` · `caution` · `partial` · `ok` ·
-`unknown`. Colour is never the only signal — the wording says the same thing,
-and every finding carries a mark as well as a colour.
+| Rank | Holds | Points multiplier |
+|---|---|---|
+| Scout | 50,000 | ×1 |
+| Archer | 250,000 | ×1.5 |
+| Outlaw | 1,000,000 | ×2 |
+| Sheriff | 5,000,000 | ×3 |
 
-### It works without an API key
+A win pays `100 × multiplier`, rising by 20% per consecutive win up to five in
+a row. A loss costs nothing but the streak. Edit `TIERS` and `BASE_POINTS` at
+the top of `api/arena.php` to change any of it.
 
-Every check the scanner reports is computed from public chain data. The key buys
-one thing: the plain-English paragraph on top. Without it the panel shows the
-verdict, the numbers and the findings exactly as it otherwise would.
+**Turning it into real pots later** means changing `settle()` and nothing else
+— the front end never knew where the reward came from. Do that on a VPS with a
+capped hot wallet, or properly on-chain with a prediction contract where this
+server only posts prices. Not on shared hosting.
 
-### Setup
+### Three decisions in the engine
 
-Your API key must never reach the browser. `api/provider.php` holds it
-server-side. Set it either as an environment variable `ROBIN_AI_KEY`, or by
-renaming `api/config.example.php` to `api/config.php` and pasting it in.
+**Rounds are clock slots, not records.** A round's id is `floor(time / 300)`,
+so every visitor agrees on which round is live without anything having to
+create it. No cron is needed: the first request after a round ends is what
+settles it.
+
+**A round with no price voids.** Prices are snapshotted on every poll, and
+settlement uses the snapshot nearest the boundary. If there is none within 100
+seconds — nobody was on the site — the round voids and nobody wins or loses. A
+round that did not move voids too, rather than quietly handing it to one side.
+
+**Quiet sites void more rounds.** If that bothers you, add a cPanel cron job to
+keep the price ticking while nobody is looking:
+
+```
+*/2 * * * * curl -s https://shopping.io/robin/api/arena.php?a=tick > /dev/null
+```
+
+It is optional. Nothing breaks without it.
+
+### What it needs from the server
+
+PHP 7.4+ with **cURL** and **PDO SQLite**. The database is created on first use
+at `api/data/arena.sqlite`; that folder ships with its own deny rule and the
+root `.htaccess` blocks `*.sqlite` as well. If `pdo_sqlite` is missing the
+arena says so plainly instead of failing strangely.
+
+`test/arena.test.sh` drives the engine through a full game on a controlled
+clock and a controlled price — entry bar, tiers, double entry, settlement in
+both directions, streaks, and both ways a round can void.
+`test/arena-ui.test.js` does the same through a browser against the real PHP.
+
+### The AI key
+
+`api/provider.php` holds it server-side. Set `ROBIN_AI_KEY` in the environment,
+or rename `api/config.example.php` to `api/config.php` and paste it in.
 `api/config.php` is git-ignored — never commit it.
 
 If you upload a new zip later, note that `config.php` ships in it and will be
 overwritten. Put a rotated key in **`api/config.local.php`** instead: it takes
 precedence and no future upload can revert it.
 
-### Check your setup
-
-After uploading, open this in a browser:
-
-```
-https://shopping.io/robin/api/provider.php?selftest=1
-```
-
-It prints a plain-text report: where the key was found (masked to its first few
-characters), which API root and auth header answered, and which request shape
-your provider speaks. Add `&live=1` to spend one real request and prove the
-whole path end to end.
+Check the setup at `https://shopping.io/robin/api/provider.php?selftest=1` — it
+reports where the key was found (masked), which API root and auth header
+answered, and which request shape your provider speaks. Add `&live=1` to spend
+one real request and prove it end to end.
 
 | What it says | What to do |
 |---|---|
@@ -307,47 +335,26 @@ whole path end to end.
 | `CONNECT tunnel failed` | Your host blocks outbound HTTPS — ask them to allow it |
 | `The API key was rejected` | The key is wrong, inactive, or out of credit |
 
-### It configures itself
+Without a key the arena runs exactly as it does with one; Robin simply sits
+every round out.
 
-You should not have to set any of this. On the first request the proxy works out
-the provider's **API root, auth header and request shape** for itself, using
-cheap `GET`s only — `/models` to find the root and auth, then a `GET` against
-each POST-only endpoint (`405` means it is there, `404` means it is not) — so
-discovery never spends a paid request. The working combination is cached for a
-day.
+**It configures itself.** On the first request the proxy works out the API
+root, auth header and request shape using cheap `GET`s only — `/models` to find
+the root and auth, then a `GET` against each POST-only endpoint (`405` means it
+is there, `404` means it is not) — so discovery never spends a paid request.
+Both shapes are tried: `POST /responses` with `input`, and
+`POST /chat/completions` with `messages`. A wrong guess comes back as a **400**
+just as often as a 404, so a 400 moves the search on exactly like a missing
+route does; a 5xx gets one quiet retry first. Set `ROBIN_AI_ROOTS` (comma
+separated) to have discovery try your own root first, with no code change.
 
-Providers disagree about the request shape, so both are tried:
+### There is also a scanner
 
-| Shape | Request | Text comes back as |
-|---|---|---|
-| `responses` | `POST /responses` with `input` | `output[].content[].text` |
-| `chat` | `POST /chat/completions` with `messages` | `choices[0].message.content` |
-
-A wrong guess comes back as a **400** just as often as a 404 — *"model does not
-support the input parameter"*, *"unknown parameter"* — so a 400 moves the search
-on exactly like a missing route does. A 5xx gets one quiet retry first, because
-that is load rather than shape.
-
-If none of the guessed roots is right, set the `ROBIN_AI_ROOTS` environment
-variable (comma separated) to have discovery try yours first — no code change —
-or edit `API_ROOT` at the top of `api/provider.php`.
-
-`test/discovery.test.sh` proves all of this against a mock provider whose root,
-auth header and shape all differ from the defaults.
-
-### Cost control
-
-`api/scan.php` limits each IP to **20 scans per 10 minutes** and caches each
-token's report for five minutes, so a token everyone is checking costs one
-request rather than hundreds. Raise or lower `SCAN_RATE_MAX`, `SCAN_RATE_WIN`
-and `CACHE_TTL` at the top of the file.
-
-### Why not a chatbot
-
-Because a chatbot on a memecoin site answers questions nobody came to ask. The
-scanner does something the chain has no other tool for — Robinhood Chain is new
-and Pons launches a token a day — and it is useful to someone who has never
-heard of $ROBIN, which is the part that brings them to the page.
+`api/scan.php` still answers, and produces a risk report for any Robinhood
+Chain token: verification, mint functions, owner powers, holder concentration,
+liquidity depth, pair age. Every check is computed from chain data and the
+model only writes the summary. Nothing on the page links to it — it is there if
+you want to point something at it. `POST {"address":"0x…"}`.
 
 ## Enabling on-page swaps
 
@@ -411,7 +418,8 @@ What each one is for:
 | `smoke.test.js` | Boots the whole page in jsdom with the network stubbed; the DOM populated and nothing threw |
 | `discovery.test.sh` | Finds a provider whose root, auth header and request shape all differ from the defaults; a 400 advances the search, a 5xx is retried once |
 | `scan.test.sh` | The scanner's scoring against known token profiles: a clean token passes, a rug is called, and unreachable sources produce "could not check" rather than an accusation |
-| `scanner.test.js` | The same three outcomes end to end in a browser, plus a bad address refused on the page |
+| `arena.test.sh` | The round engine on a controlled clock: the entry bar, tiers, double entry, settlement both ways, streaks, and both ways a round voids |
+| `arena-ui.test.js` | The arena in a browser against the real PHP — the countdown agrees with the server, a pick reaches it, a second pick is refused |
 | `motion.test.js` | Animations still run under `prefers-reduced-motion` (Android battery saver sets it), and the glass panels are static except when one arrives |
 | `buypop.test.js` | Buy notifications replay on load, exactly one is on screen at a time, and a silent chain shows nothing at all |
 | `shots.js` | Renders in Chromium at three widths and reports horizontal overflow or undersized tap targets |

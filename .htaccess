@@ -5,9 +5,10 @@
 # ==========================================================================
 
 # --- keep the API key out of the browser --------------------------------
-# api/config.php holds your key. PHP never serves its source, but a
-# misconfigured host can. Deny it outright, along with dotfiles.
-<FilesMatch "^(config\.php|config\.local\.php|config\.example\.php|\.env.*|.*\.log)$">
+# api/config.php holds your key, and api/data holds the arena's database.
+# PHP never serves their source, but a misconfigured host can. Deny them
+# outright, along with dotfiles.
+<FilesMatch "^(config\.php|config\.local\.php|config\.example\.php|\.env.*|.*\.log|.*\.sqlite|.*\.sqlite-.*)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
