@@ -16,10 +16,18 @@ function jfail(int $code, string $msg, array $detail = []): void {
     exit;
 }
 
-/** Per-IP token bucket, shared by every endpoint that costs money. */
+/**
+ * Per-IP token bucket, shared by every endpoint that costs money.
+ *
+ * The storage directory is overridable so a test run gets its own buckets. It
+ * used to always live in the system temp directory, which meant every test run
+ * on this machine drew from the same allowance and the later ones started
+ * getting refused — a rate limit doing its job, on the wrong thing entirely.
+ */
 function rateLimited(string $bucketName, int $max, int $window): bool {
     $ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-    $file = sys_get_temp_dir() . '/robin_' . $bucketName . '_' . sha1($ip) . '.json';
+    $dir = getenv('ROBIN_RATE_DIR') ?: sys_get_temp_dir();
+    $file = $dir . '/robin_' . $bucketName . '_' . sha1($ip) . '.json';
     $now  = time();
 
     $hits = [];

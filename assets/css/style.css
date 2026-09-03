@@ -236,6 +236,42 @@ input{font:inherit;color:inherit}
   line-height:.9;letter-spacing:-.055em;
   isolation:isolate;
 }
+
+/* ---- the artwork wordmark, when assets/img/robin-wordmark.png is present ---- */
+/*
+   The drawn lettering below is still in the markup, hidden, and .wm-drawn on
+   the container brings it back if the image fails to load.
+*/
+.wordmark .wm-img{
+  display:block;width:100%;max-width:min(520px,92vw);height:auto;
+  filter:drop-shadow(0 10px 26px rgba(10,40,70,.45));
+}
+.wordmark:not(.wm-drawn) .wm-glow,
+.wordmark:not(.wm-drawn) .wm-body,
+.wordmark:not(.wm-drawn) .wm-spec,
+.wordmark:not(.wm-drawn)::after{display:none}
+.wordmark.wm-drawn .wm-shine{display:none}
+
+/* The reflection: a bright bar that travels across, clipped to the letterforms
+   by masking with the artwork's own alpha — so the light lands on the letters
+   and nowhere else. It moves by transform, so it costs the compositor and
+   nothing else. */
+.wm-shine{
+  position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;
+  -webkit-mask-image:url("../img/robin-wordmark.png");
+          mask-image:url("../img/robin-wordmark.png");
+  -webkit-mask-size:100% 100%;         mask-size:100% 100%;
+  -webkit-mask-repeat:no-repeat;       mask-repeat:no-repeat;
+  -webkit-mask-position:center;        mask-position:center;
+}
+.wm-shine::after{
+  content:'';position:absolute;top:-40%;bottom:-40%;left:0;width:30%;
+  background:linear-gradient(104deg,
+    transparent,rgba(255,255,255,.20) 34%,rgba(255,255,255,.92) 50%,
+    rgba(255,255,255,.20) 66%,transparent);
+  transform:translate3d(-240%,0,0);
+  animation:sweep 6.5s var(--ease) infinite 1.4s;
+}
 /* NB: `background-image`, never the `background` shorthand — the shorthand
    resets background-clip back to border-box and the text fills as a solid box. */
 .wordmark span{display:block}

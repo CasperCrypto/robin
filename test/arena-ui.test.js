@@ -46,6 +46,7 @@ function portFree(port) {
   fs.writeFileSync(path.join(dir, 'balance.txt'), '13da329b6336471800000');   // 1.5M ROBIN = Outlaw
 
   const env = { ...process.env, ARENA_DIR: dir, ROBIN_AI_KEY: '',
+                ROBIN_RATE_DIR: dir,          // its own rate-limit buckets, not the machine's
                 ARENA_RPC: `http://127.0.0.1:${MOCK}/rpc` };
   mock = spawn('php', ['-S', `127.0.0.1:${MOCK}`, '-t', 'test', 'test/mock-arena.php'],
                { cwd: ROOT, env, stdio: 'ignore' });

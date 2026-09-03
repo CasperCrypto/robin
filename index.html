@@ -74,9 +74,19 @@
       <div class="hero-copy">
         <span class="eyebrow enter enter-2">Live on Robinhood Chain &middot; 4663</span>
 
-        <h1 class="wordmark enter enter-3" data-text="$ROBIN">
+        <!--
+          The wordmark is the artwork when it is present and the drawn version
+          when it is not. `onerror` flips one class on the container, which
+          swaps the whole treatment — so a missing file degrades to the old
+          lettering rather than to a broken-image icon in the middle of the hero.
+        -->
+        <h1 class="wordmark enter enter-3" id="wordmark" data-text="$ROBIN">
+          <img class="wm-img" src="assets/img/robin-wordmark.png" alt="$ROBIN"
+               decoding="async" fetchpriority="high"
+               onerror="document.getElementById('wordmark').classList.add('wm-drawn');this.remove()">
+          <span class="wm-shine" aria-hidden="true"></span>
           <span class="wm-glow" aria-hidden="true">$ROBIN</span>
-          <span class="wm-body">$ROBIN</span>
+          <span class="wm-body" aria-hidden="true">$ROBIN</span>
           <span class="wm-spec" aria-hidden="true">$ROBIN</span>
         </h1>
 

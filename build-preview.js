@@ -30,6 +30,21 @@ for (const f of IMG) html = html.replaceAll('assets/img/' + f, dataUri('assets/i
 // anything once it is inlined into the document.
 css = css.replaceAll('../img/grain.png', dataUri('assets/img/grain.png'));
 
+// The artwork wordmark is optional: without it the page falls back to the
+// drawn lettering, and the preview should show whichever the real site would.
+const WORDMARK = 'assets/img/robin-wordmark.png';
+if (fs.existsSync(path.join(root, WORDMARK))) {
+  const uri = dataUri(WORDMARK);
+  html = html.replaceAll(WORDMARK, uri);
+  css = css.replaceAll('../img/robin-wordmark.png', uri);
+} else {
+  // No file, so take the <img> out altogether and start on the drawn wordmark.
+  // Leaving the tag in would have the preview reach for a file that is not
+  // there, which is exactly what this build is supposed to avoid.
+  html = html.replace('class="wordmark enter enter-3"', 'class="wordmark wm-drawn enter enter-3"')
+             .replace(/\s*<img class="wm-img"[\s\S]*?>\s*/, '\n          ');
+}
+
 // keep only what lives inside <body>, plus the title
 const title = 'Robin Nakamoto';   // gallery name; the shipped site keeps its SEO title
 let body = html.slice(html.indexOf('<body>') + 6, html.indexOf('</body>'));

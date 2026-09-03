@@ -4,7 +4,7 @@
   "private": true,
   "description": "$ROBIN \u2014 Robin Nakamoto. Static site for shopping.io/robin.",
   "scripts": {
-    "test": "node test/abi.test.js && node test/smoke.test.js && bash test/discovery.test.sh && bash test/scan.test.sh && bash test/arena.test.sh && node test/motion.test.js && node test/buypop.test.js /tmp && node test/arena-ui.test.js",
+    "test": "node test/abi.test.js && node test/jackpot.test.js && node test/smoke.test.js && bash test/discovery.test.sh && bash test/scan.test.sh && bash test/arena.test.sh && node test/motion.test.js && node test/buypop.test.js /tmp && node test/arena-ui.test.js",
     "perf": "node test/perf/compare.js",
     "preview": "node build-preview.js && node test/preview.test.js preview.html",
     "package": "bash package.sh",
@@ -13,6 +13,11 @@
   "devDependencies": {
     "ethers": "^6.17.0",
     "jsdom": "^27.0.0",
-    "playwright": "^1.40.0"
+    "playwright": "^1.40.0",
+    "solc": "0.8.26",
+    "@ethereumjs/vm": "^8.1.1",
+    "@ethereumjs/common": "^4.4.0",
+    "@ethereumjs/tx": "^5.4.0",
+    "@ethereumjs/util": "^9.1.0"
   }
 }

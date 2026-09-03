@@ -27,7 +27,7 @@ ARENA_DIR="$DIR" php -S 127.0.0.1:$MOCK -t test test/mock-arena.php >/dev/null 2
 SRV=$!
 sleep 1.2
 
-env_() { echo "ARENA_NOW=$1 ARENA_DIR=$DIR ARENA_RPC=http://127.0.0.1:$MOCK/rpc ROBIN_AI_KEY="; }
+env_() { echo "ARENA_NOW=$1 ARENA_DIR=$DIR ROBIN_RATE_DIR=$DIR ARENA_RPC=http://127.0.0.1:$MOCK/rpc ROBIN_AI_KEY="; }
 
 get() {  # $1 = time, $2 = php $_GET literal
   env $(env_ "$1") php -r "\$_GET=$2;\$_SERVER['REQUEST_METHOD']='GET';include 'api/arena.php';" 2>&1
