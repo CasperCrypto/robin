@@ -112,17 +112,14 @@ window.ROBIN = {
     presets:        [0.01, 0.05, 0.1, 0.5]   // quick-buy amounts in ETH
   },
 
-  /* ------------------------------------------------------------------- ai */
-  ai: {
-    // Server-side proxy holding your API key. Relative so it works from the
-    // /robin sub-path. PHP hosting -> 'api/ai.php' | Vercel -> 'api/ai'
-    endpoint: 'api/ai.php',
-
-    // An image-output model on your provider. Must accept an input image and
-    // return one, so the generated doge stays your doge. See the README for a
-    // one-line curl that lists what your key can reach.
-    model: 'google/gemini-2.5-flash-image',
-
+  /* -------------------------------------------------------------- scanner */
+  /* Robin Scanner reads any Robinhood Chain token and reports what could go
+   * wrong with it. Every check is computed on the server from explorer and
+   * market data; the API key is only used to write the plain-English summary
+   * at the top, and the scanner works without one. */
+  scanner: {
+    // Server-side endpoint. Relative, so it works from the /robin sub-path.
+    endpoint: 'api/scan.php',
     enabled: true
   },
 

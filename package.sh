@@ -15,8 +15,6 @@ BUILD="$(date +%Y%m%d%H%M)"
 sed -i -E "s|(href=\"assets/css/[^\"?]+)\"|\1?v=$BUILD\"|g; s|(src=\"assets/js/[^\"?]+)\"|\1?v=$BUILD\"|g" dist/index.html
 echo "build id $BUILD stamped on $(grep -c "?v=$BUILD" dist/index.html) asset urls"
 
-# forge-sample.webp exists only so the offline preview has something to show.
-rm -f dist/assets/img/forge-sample.webp
 
 # The API key is injected from the environment at package time, never stored
 # in this script or the repository:
@@ -26,7 +24,7 @@ KEY="${ROBIN_AI_KEY:-}"
 cat > dist/api/config.php <<PHP
 <?php
 /**
- * API key for the meme forge.
+ * API key for the scanner's plain-English summaries.
  *
  * SECURITY: if this key has ever been pasted into a chat, an email or a
  * screenshot, rotate it at your provider and replace the value below. This

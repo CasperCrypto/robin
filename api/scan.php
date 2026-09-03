@@ -19,11 +19,10 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
 
-/* ai.php carries the endpoint discovery and the HTTP helper. It only runs its
-   own request path when actually called as an endpoint, so requiring it here
-   just brings the functions along. */
-define('ROBIN_LIB_ONLY', true);
-require_once __DIR__ . '/ai.php';
+/* provider.php carries the key, the endpoint discovery and the one text call.
+   It only runs its self-test when asked for one over HTTP, so requiring it
+   here just brings the functions along. */
+require_once __DIR__ . '/provider.php';
 require_once __DIR__ . '/lib.php';
 
 define('EXPLORER_API', getenv('SCAN_EXPLORER') ?: 'https://robinhoodchain.blockscout.com/api/v2');

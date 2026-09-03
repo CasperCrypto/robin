@@ -44,7 +44,7 @@
       <a href="#swap">Swap</a>
       <a href="#feed">Live buys</a>
       <a href="#tokenomics">Tokenomics</a>
-      <a href="#ai">Meme forge</a>
+      <a href="#ai">Scanner</a>
       <a href="#community">Community</a>
       <a href="#faq">FAQ</a>
     </nav>
@@ -319,53 +319,55 @@
 <section class="sec dark" id="ai" style="padding-top:0">
   <div class="wrap">
     <div class="sec-head center rv">
-      <span class="eyebrow">Robin's meme machine</span>
-      <h2 class="sec-title">Put Robin in it.</h2>
-      <p class="sec-sub">Describe any scene and the AI paints Robin into it — same dog, same
-        feathered hat, same glasses — because it draws from the real artwork every time.
-        Download it, post it, watch it spread.</p>
+      <span class="eyebrow">Robin Scanner</span>
+      <h2 class="sec-title">Check any token before you buy it.</h2>
+      <p class="sec-sub">Paste a Robinhood Chain contract address. Robin reads the contract,
+        the holder list and the pool, works out what could actually go wrong, and says it
+        in plain English. Free, no wallet, no signature.</p>
     </div>
 
-    <div class="forge lg lg-d rv">
-      <div class="forge-stage" id="forgeStage" data-state="idle">
-        <img class="forge-img" id="forgeImg" alt="" hidden>
-        <div class="forge-idle" id="forgeIdle">
-          <picture>
-            <source srcset="assets/img/robin-logo.webp" type="image/webp">
-            <img src="assets/img/robin-logo.png" width="128" height="128" alt="" loading="lazy" decoding="async">
-          </picture>
-          <p>Your meme lands here.</p>
-        </div>
-        <div class="forge-load" id="forgeLoad" hidden>
-          <div class="forge-orb"><span></span><span></span><span></span></div>
-          <p id="forgeStatus">Sharpening the crayons…</p>
-        </div>
+    <div class="scan lg lg-d rv">
+      <form class="scan-form" id="scanForm">
+        <input class="scan-input" id="scanAddr" type="text" spellcheck="false"
+               autocomplete="off" autocapitalize="off" maxlength="42"
+               placeholder="0x… token address" aria-label="Token contract address">
+        <button class="btn btn-lime" id="scanBtn" type="submit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          Scan
+        </button>
+      </form>
+      <div class="ai-chips" id="scanChips"></div>
+
+      <div class="scan-load" id="scanLoad" hidden>
+        <div class="scan-orb"><span></span><span></span><span></span></div>
+        <p id="scanStatus">Reading the contract…</p>
       </div>
 
-      <div class="forge-side">
-        <label class="forge-label" for="forgePrompt">What should Robin be doing?</label>
-        <div class="ai-chips" id="forgeChips"></div>
-        <form class="forge-form" id="forgeForm">
-          <textarea id="forgePrompt" rows="3" maxlength="400"
-                    placeholder="riding a rocket over Wall Street, holding a green flag"
-                    aria-label="Describe the scene"></textarea>
-          <button class="btn btn-lime btn-block" id="forgeBtn" type="submit">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3v4M3 5h4M6 17v4M4 19h4M13 3l2.5 6.5L22 12l-6.5 2.5L13 21l-2.5-6.5L4 12l6.5-2.5z"/></svg>
-            Generate
-          </button>
-        </form>
-
-        <div class="forge-actions" id="forgeActions" hidden>
-          <a class="btn btn-glass on-dark" id="forgeDownload" download="robin-meme.png">Download</a>
-          <button class="btn btn-glass on-dark" id="forgeCopy" type="button">Copy image</button>
-          <a class="btn btn-glass on-dark" id="forgeShare" target="_blank" rel="noopener">Post on X</a>
+      <div class="scan-out" id="scanOut" hidden>
+        <div class="scan-verdict" id="scanVerdict">
+          <span class="sv-dot" aria-hidden="true"></span>
+          <span class="sv-text">
+            <b id="scanLabel"></b>
+            <small id="scanName"></small>
+          </span>
         </div>
 
-        <p class="forge-note" id="forgeNote">
-          Free to use, a few seconds each. Images are made by an AI and belong to whoever
-          posts them — go wild, keep it legal.
-        </p>
+        <p class="scan-summary" id="scanSummary" hidden></p>
+
+        <div class="scan-stats" id="scanStats"></div>
+        <ul class="scan-findings" id="scanFindings"></ul>
+
+        <details class="scan-holders" id="scanHolders" hidden>
+          <summary>Largest holders</summary>
+          <ul id="scanHolderList"></ul>
+        </details>
       </div>
+
+      <p class="scan-note" id="scanNote">
+        Every check here is arithmetic on public data — who holds what, how deep the pool is,
+        what the contract source actually contains. Robin only explains the findings; it
+        cannot overrule them. This is a safety read, not financial advice.
+      </p>
     </div>
   </div>
 </section>
@@ -510,7 +512,7 @@
 <script src="assets/js/wallet.js"></script>
 <script src="assets/js/swap.js"></script>
 <script src="assets/js/feed.js"></script>
-<script src="assets/js/ai.js"></script>
+<script src="assets/js/scanner.js"></script>
 <script src="assets/js/doge.js"></script>
 <script src="assets/js/buypop.js"></script>
 </body>

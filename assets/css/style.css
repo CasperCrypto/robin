@@ -295,6 +295,7 @@ input{font:inherit;color:inherit}
 @keyframes blink{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-4px)}}
 @keyframes toastin{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 @keyframes toastout{to{opacity:0;transform:translateY(12px)}}
+@keyframes orb{0%,70%,100%{transform:translateY(0) scale(.86);opacity:.5}35%{transform:translateY(-13px) scale(1);opacity:1}}
 
 /* Hero entrance: runs on load, so the page settles visible on its own. */
 .enter{animation:rise .62s var(--ease-out) both}
@@ -872,61 +873,125 @@ body.has-buybar .foot{padding-bottom:calc(26px + 70px + env(safe-area-inset-bott
 .fact.accent .fact-v{color:var(--lime-300)}
 .fact p{margin:7px 0 0;font-size:13px;line-height:1.55;color:var(--text-inv-soft)}
 
-/* ═══════════════════════════════════════════════════════════ the meme forge */
-.forge{display:grid;gap:18px;padding:16px;border-radius:var(--r-2xl)}
+/* ═════════════════════════════════════════════════════════ Robin Scanner */
+.scan{display:flex;flex-direction:column;gap:14px;padding:16px;border-radius:var(--r-2xl)}
 
-.forge-stage{
-  position:relative;aspect-ratio:1;border-radius:var(--r-xl);overflow:hidden;
-  display:grid;place-items:center;
-  background:
-    radial-gradient(circle at 50% 42%,rgba(168,220,43,.16),transparent 62%),
-    var(--ink-2);
-  border:1px solid var(--gd-rim);
-}
-.forge-stage[data-state="done"]{background:var(--ink)}
-.forge-img{width:100%;height:100%;object-fit:cover;animation:pop .5s var(--ease-out)}
-
-.forge-idle{text-align:center;padding:24px;color:var(--text-inv-mute)}
-.forge-idle img{width:88px;height:88px;border-radius:22px;margin:0 auto 14px;opacity:.5;filter:grayscale(.35)}
-.forge-idle p{margin:0;font-size:14px;font-weight:600}
-
-.forge-load{text-align:center;padding:24px}
-.forge-load p{margin:16px 0 0;font-size:13.5px;color:var(--text-inv-soft);font-weight:600}
-.forge-orb{display:flex;gap:9px;justify-content:center}
-.forge-orb span{
-  width:13px;height:13px;border-radius:50%;
-  background:linear-gradient(160deg,var(--lime-300),var(--lime-600));
-  animation:orb 1.25s var(--ease) infinite;
-  box-shadow:0 0 18px rgba(168,220,43,.55);
-}
-.forge-orb span:nth-child(2){animation-delay:.16s}
-.forge-orb span:nth-child(3){animation-delay:.32s}
-@keyframes orb{0%,70%,100%{transform:translateY(0) scale(.86);opacity:.5}35%{transform:translateY(-13px) scale(1);opacity:1}}
-
-.forge-side{display:flex;flex-direction:column}
-.forge-label{font-size:12.5px;font-weight:700;color:var(--text-inv-soft);margin-bottom:10px}
-.forge-form{display:flex;flex-direction:column;gap:10px}
-.forge-form textarea{
-  width:100%;resize:vertical;min-height:82px;padding:13px 15px;border-radius:var(--r-md);
+.scan-form{display:flex;flex-direction:column;gap:10px}
+.scan-input{
+  width:100%;padding:15px 16px;border-radius:14px;
   background:var(--gd-fill);border:1px solid var(--gd-rim);color:var(--text-inv);
-  font-family:var(--font);font-size:16px;line-height:1.5;outline:none;
+  font-family:var(--font-mono);font-size:14px;letter-spacing:-.01em;
+  transition:border-color .16s,background .16s;
 }
-.forge-form textarea:focus{border-color:rgba(168,220,43,.55);background:var(--gd-fill-hi)}
-.forge-form textarea::placeholder{color:rgba(244,255,227,.30)}
+.scan-input:focus{border-color:rgba(168,220,43,.55);background:var(--gd-fill-hi);outline:none}
+.scan-input::placeholder{color:rgba(244,255,227,.30)}
+.scan-form .btn{flex:none}
 
-.forge-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.forge-actions .btn{flex:1 1 calc(50% - 4px);padding:12px 14px;font-size:13.5px}
+/* thinking */
+.scan-load{text-align:center;padding:22px 10px}
+.scan-load p{margin:16px 0 0;font-size:13.5px;color:var(--text-inv-soft);font-weight:600}
+.scan-orb{display:flex;gap:9px;justify-content:center}
+.scan-orb span{
+  width:11px;height:11px;border-radius:50%;background:var(--lime-400);
+  animation:orb 1.25s var(--ease) infinite;
+}
+.scan-orb span:nth-child(2){animation-delay:.16s}
+.scan-orb span:nth-child(3){animation-delay:.32s}
 
-.forge-note{margin:12px 0 0;font-size:12px;line-height:1.55;color:var(--text-inv-mute)}
-.forge-note.err{color:#ffc9c9}
+/* the answer */
+.scan-out{display:flex;flex-direction:column;gap:14px;animation:slidein .38s var(--ease-out)}
 
+.scan-verdict{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 16px;border-radius:16px;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);
+}
+.sv-dot{
+  flex:none;width:12px;height:12px;border-radius:50%;
+  background:var(--text-inv-mute);box-shadow:0 0 0 4px rgba(255,255,255,.06);
+}
+.sv-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sv-text b{font-family:var(--font-display);font-size:19px;letter-spacing:-.02em;line-height:1.15}
+.sv-text small{font-size:12.5px;color:var(--text-inv-mute);font-weight:600}
+
+/* Colour carries meaning here, so it is never the only signal: the wording of
+   the verdict says the same thing, and each finding below is prefixed with a
+   mark as well as a colour. */
+.scan-verdict.v-ok     {border-color:rgba(61,220,132,.45);background:rgba(61,220,132,.09)}
+.scan-verdict.v-ok      .sv-dot{background:var(--up);box-shadow:0 0 0 4px rgba(61,220,132,.18)}
+.scan-verdict.v-ok      .sv-text b{color:var(--up)}
+.scan-verdict.v-partial{border-color:rgba(168,220,43,.4);background:rgba(168,220,43,.08)}
+.scan-verdict.v-partial .sv-dot{background:var(--lime-400);box-shadow:0 0 0 4px rgba(168,220,43,.18)}
+.scan-verdict.v-partial .sv-text b{color:var(--lime-300)}
+.scan-verdict.v-caution{border-color:rgba(255,212,71,.5);background:rgba(255,212,71,.08)}
+.scan-verdict.v-caution .sv-dot{background:var(--gold);box-shadow:0 0 0 4px rgba(255,212,71,.18)}
+.scan-verdict.v-caution .sv-text b{color:var(--gold)}
+.scan-verdict.v-high   {border-color:rgba(255,107,107,.55);background:rgba(255,107,107,.10)}
+.scan-verdict.v-high    .sv-dot{background:var(--down);box-shadow:0 0 0 4px rgba(255,107,107,.2)}
+.scan-verdict.v-high    .sv-text b{color:#ff8f8f}
+.scan-verdict.v-unknown .sv-text b{color:var(--text-inv-soft)}
+
+.scan-summary{
+  margin:0;padding:14px 16px;border-radius:14px;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);
+  font-size:14px;line-height:1.62;color:var(--text-inv-soft);
+}
+
+.scan-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.scan-stats div{
+  padding:11px 13px;border-radius:12px;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);
+  display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+.scan-stats span{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--text-inv-mute)}
+.scan-stats b{
+  font-family:var(--font-display);font-size:16px;letter-spacing:-.02em;color:var(--text-inv);
+  font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+.scan-findings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.scan-findings li{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:12px 14px;border-radius:13px;
+  background:var(--gd-fill);border:1px solid var(--gd-rim);
+}
+.f-icon{
+  flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+  font-size:12px;font-weight:800;margin-top:1px;
+  background:rgba(255,255,255,.08);color:var(--text-inv-soft);
+}
+.scan-findings b{display:block;font-size:13.5px;font-weight:700;color:var(--text-inv);line-height:1.4}
+.scan-findings i{display:block;font-style:normal;font-size:12.5px;line-height:1.55;color:var(--text-inv-mute);margin-top:3px}
+.scan-findings .f-good   {border-color:rgba(61,220,132,.28)}
+.scan-findings .f-good    .f-icon{background:rgba(61,220,132,.18);color:var(--up)}
+.scan-findings .f-warn   {border-color:rgba(255,212,71,.3)}
+.scan-findings .f-warn    .f-icon{background:rgba(255,212,71,.18);color:var(--gold)}
+.scan-findings .f-bad    {border-color:rgba(255,107,107,.34)}
+.scan-findings .f-bad     .f-icon{background:rgba(255,107,107,.18);color:#ff8f8f}
+.scan-findings .f-unknown .f-icon{background:rgba(255,255,255,.08)}
+
+.scan-holders{
+  border-radius:13px;background:var(--gd-fill);border:1px solid var(--gd-rim);
+  padding:12px 14px;
+}
+.scan-holders summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--text-inv-soft)}
+.scan-holders ul{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
+.scan-holders li{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.scan-holders code{font-family:var(--font-mono);color:var(--text-inv-soft)}
+.scan-holders em{font-style:normal;font-size:11px;color:var(--text-inv-mute)}
+.scan-holders b{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text-inv)}
+
+.scan-note{margin:2px 0 0;font-size:12px;line-height:1.55;color:var(--text-inv-mute)}
+.scan-note.bad{color:#ffc9c9}
+
+@media (min-width:560px){
+  .scan-form{flex-direction:row;align-items:center}
+  .scan-input{flex:1}
+  .scan-stats{grid-template-columns:repeat(3,1fr)}
+}
 @media (min-width:700px){
-  .forge{grid-template-columns:1fr 1fr;gap:26px;padding:24px;align-items:start}
-  .forge-side{padding-top:4px}
-  .forge-actions .btn{flex:1 1 auto}
-}
-@media (min-width:940px){
-  .forge{grid-template-columns:440px 1fr;gap:32px}
+  .scan{padding:24px;gap:16px}
+  .scan-stats{grid-template-columns:repeat(5,1fr)}
 }
 
 /* ══════════════════════════════════════════════════════════ X / Twitter */

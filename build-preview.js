@@ -6,8 +6,8 @@ const root = __dirname;
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 let html = read('index.html');
-const css = read('assets/css/style.css');
-const JS = ['config.js','keccak.js','app.js','market.js','wallet.js','swap.js','feed.js','ai.js','doge.js'];
+let css = read('assets/css/style.css');
+const JS = ['config.js','keccak.js','app.js','market.js','wallet.js','swap.js','feed.js','scanner.js','doge.js','buypop.js'];
 
 // images -> data URIs (the preview sandbox can't load sibling files)
 const MIME = { png:'image/png', webp:'image/webp', gif:'image/gif', ico:'image/x-icon' };
@@ -21,11 +21,14 @@ const dataUri = (p) => {
 html = html.replaceAll('assets/img/robin-doge.gif', 'assets/img/robin-doge.webp');
 const IMG = [
   'robin-logo.png','robin-logo.webp','robin-logo-128.png','robin-logo-128.webp',
-  'robin-doge.webp','robin-doge-poster.webp','forge-sample.webp',
+  'robin-doge.webp','robin-doge-poster.webp','grain.png',
   'favicon-32.png','favicon-48.png','favicon.ico','apple-touch-icon.png',
 ];
 const LOGO = dataUri('assets/img/robin-logo.png');
 for (const f of IMG) html = html.replaceAll('assets/img/' + f, dataUri('assets/img/' + f));
+// The stylesheet reaches images by its own relative path, which stops meaning
+// anything once it is inlined into the document.
+css = css.replaceAll('../img/grain.png', dataUri('assets/img/grain.png'));
 
 // keep only what lives inside <body>, plus the title
 const title = 'Robin Nakamoto';   // gallery name; the shipped site keeps its SEO title

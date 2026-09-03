@@ -47,7 +47,7 @@ setTimeout(() => {
   check('swap shows balances', t('#balFrom')!=='—', t('#balFrom'));
   check('swap rate populated', t('#mRate').includes('ROBIN'), t('#mRate'));
   check('supply facts rendered', d.querySelectorAll('#tokList .fact').length===4);
-  check('meme forge present', !!d.querySelector('#forgeStage'));
+  check('scanner present', !!d.querySelector('#scanForm'));
   check('sample badge exists and is armed by the fallback',
     !!d.querySelector('#demoBadge') &&
     d.documentElement.getAttribute('data-preview-sample') === '1');

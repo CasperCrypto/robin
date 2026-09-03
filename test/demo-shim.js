@@ -38,9 +38,34 @@
     return out;
   }
 
-  // The forge returns a picture now. The preview can't call the image service,
-  // so it answers with a pre-rendered sample of the same shape.
-  var SAMPLE = 'assets/img/forge-sample.webp';
+  /* A sample scan, for a preview that cannot reach PHP. Deliberately the real
+     token with its real shape — the point of the preview is to show what the
+     panel looks like, and inventing a scary verdict for $ROBIN would be a lie
+     told about our own token. */
+  var SAMPLE_SCAN = {
+    address: '0x280413fbf06ccc1114094a5967db2191d49ee75e',
+    name: 'Robin Nakamoto', symbol: 'ROBIN',
+    verdict: 'ok', label: 'Nothing alarming',
+    stats: { price: 0.00007012, mcap: 70120, liquidity: 41800,
+             volume24h: 18400, holders: 412, supply: 1e9, ageHours: 320, verified: true },
+    findings: [
+      { level: 'good', what: 'Contract source is verified',
+        why: 'Anyone can read exactly what this contract does on the explorer.' },
+      { level: 'good', what: 'No mint function found', why: 'The supply cannot be increased.' },
+      { level: 'good', what: 'Liquidity is locked',
+        why: 'The Pons launch pool is permanently locked; nobody can pull it.' },
+      { level: 'warn', what: 'Fees can be changed after launch',
+        why: 'The owner can alter the buy or sell tax. Check what it is set to now.' }
+    ],
+    top: [
+      { address: '0x7d8a56584434d8355b891da0ff62d9168669f87d', pct: 61.4, isContract: true },
+      { address: '0x2f9c8b1a4e5d7c3b6a8f0e1d2c4b5a6978f3e2d1', pct: 3.0, isContract: false }
+    ],
+    summary: 'Supply is fixed and the pool is locked, which rules out the two things '
+           + 'that usually go wrong. The one thing to keep an eye on is that the tax '
+           + 'is still adjustable by the owner. This is a preview sample, not a live scan.',
+    unreachable: [], scannedAt: Math.floor(Date.now() / 1000)
+  };
 
   var real = window.fetch ? window.fetch.bind(window) : null;
 
@@ -98,9 +123,8 @@
       });
     }
 
-    if (u.indexOf('api/ai') > -1) {
-      markSample();
-      return J({ image: SAMPLE, model: 'preview-sample' }, 2600);
+    if (u.indexOf('api/scan') > -1) {
+      return passthroughOr(url, opts, function () { return J(SAMPLE_SCAN, 1800); });
     }
 
     return real ? real(url, opts) : Promise.reject(new Error('blocked'));

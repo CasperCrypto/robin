@@ -1,7 +1,8 @@
 <?php
 /**
- * lib.php — the bits scan.php and ai.php both need: HTTP, rate limiting, and
- * the one call that asks a language model to explain a set of findings.
+ * lib.php — the bits the scanner needs beyond the provider connection: HTTP,
+ * rate limiting, formatting, and the one call that asks a language model to
+ * explain a set of findings it is not allowed to overturn.
  */
 
 declare(strict_types=1);
@@ -79,8 +80,7 @@ function usdShort(?float $n): string {
  * Returns null on any failure — the report stands on its own without prose.
  */
 function summarise(array $report): ?string {
-    $key = function_exists('apiKey') ? apiKey() : '';
-    if ($key === '') return null;
+    if (!function_exists('askText') || apiKey() === '') return null;
 
     $facts = [];
     foreach ($report['findings'] as $f) {
@@ -106,26 +106,10 @@ function summarise(array $report): ?string {
       . "- Never tell anyone to buy or sell. This is a safety read, not advice.\n"
       . "- Plain language, no headings, no bullet points, no hedging filler.";
 
-    $ep = function_exists('endpoint') ? endpoint($key) : null;
-    if (!$ep) return null;
-
-    $payload = $ep['shape'] === 'responses'
-        ? ['model' => AI_TEXT_MODEL, 'input' => [['role' => 'user',
-             'content' => [['type' => 'input_text', 'text' => $prompt]]]]]
-        : ['model' => AI_TEXT_MODEL, 'messages' => [['role' => 'user', 'content' => $prompt]]];
-
-    $path = $ep['shape'] === 'responses' ? PATH_RESPONSES : PATH_CHAT;
-    [$code, $j] = post($ep['root'] . $path, $key, $payload, 45, $ep['auth']);
-    if ($code !== 200 || !is_array($j)) return null;
-
-    // Responses API puts text in output[].content[].text; chat in choices[].
-    if (is_array($j['output'] ?? null)) {
-        foreach ($j['output'] as $item) {
-            foreach (($item['content'] ?? []) as $part) {
-                if (!empty($part['text'])) return trim((string)$part['text']);
-            }
-        }
+    $r = askText($prompt, null, 45);
+    if ($r['text'] === null) {
+        error_log('[robin-scan] summary unavailable: ' . $r['error']);
+        return null;
     }
-    $txt = $j['choices'][0]['message']['content'] ?? null;
-    return is_string($txt) && $txt !== '' ? trim($txt) : null;
+    return $r['text'];
 }

@@ -90,7 +90,7 @@ win.fetch = (url, opts) => {
   return Promise.resolve({ ok: false, status: 503, json: () => Promise.resolve({ error: 'stub' }) });
 };
 
-['config.js','keccak.js','app.js','market.js','wallet.js','swap.js','feed.js','ai.js','doge.js']
+['config.js','keccak.js','app.js','market.js','wallet.js','swap.js','feed.js','scanner.js','doge.js']
   .forEach((f) => {
     try { win.eval(fs.readFileSync(path.join(root, 'assets/js', f), 'utf8')); }
     catch (e) { errors.push(`${f} threw: ${e.message}`); }
@@ -129,10 +129,10 @@ setTimeout(() => {
   check('preset buttons rendered', d.querySelectorAll('#presets button').length === 4);
   check('swap CTA says connect, never install', t('#swapBtn') === 'Connect wallet', t('#swapBtn'));
   check('nav button says Connect', t('#navConnect') === 'Connect', t('#navConnect'));
-  check('meme forge present', !!d.querySelector('#forgeStage'));
-  check('forge starts idle', d.querySelector('#forgeStage')?.dataset.state === 'idle');
-  check('forge presets rendered', d.querySelectorAll('#forgeChips button').length === 6);
-  check('forge actions hidden until a result', d.querySelector('#forgeActions')?.hasAttribute('hidden'));
+  check('scanner present', !!d.querySelector('#scanForm'));
+  check('scanner starts empty', d.querySelector('#scanOut')?.hasAttribute('hidden'));
+  check('scanner is not thinking yet', d.querySelector('#scanLoad')?.hasAttribute('hidden'));
+  check('scanner offers something to press', d.querySelectorAll('#scanChips button').length >= 1);
   check('only one AI feature ships',
     !d.querySelector('#aiLog') && !d.querySelector('#alphaOut') && !d.querySelector('#memeOut'));
   check('FAQ items present', d.querySelectorAll('.faq details').length === 7);
