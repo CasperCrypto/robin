@@ -112,6 +112,16 @@ window.ROBIN = {
     presets:        [0.01, 0.05, 0.1, 0.5]   // quick-buy amounts in ETH
   },
 
+  /* ----------------------------------------------------------------- room */
+  /* Live presence and reactions. One request per client per tick carries the
+   * heartbeat, any reaction, and the cursor — so the cost of this feature is
+   * one poll per visitor, and none at all from a background tab. */
+  room: {
+    endpoint: 'api/room.php',
+    pollMs: 5000,
+    enabled: true
+  },
+
   /* ---------------------------------------------------------------- arena */
   /* Robin Arena: five-minute rounds on the $ROBIN price. Nobody deposits
    * anything — entry is gated by the balance a wallet already holds, checked

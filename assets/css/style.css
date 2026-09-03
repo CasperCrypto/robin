@@ -1216,6 +1216,83 @@ body.bar-up .buypop-wrap{transform:translate3d(0,-62px,0)}
   .buypop{width:320px}
 }
 
+/* ═════════════════════════════════════════════════════════════ the room */
+/*
+   A head count and six emoji, pinned to the right edge. The rail is the only
+   fixed furniture on that side, so it never has to negotiate with the buy
+   notifications along the bottom or the sticky buy bar under them.
+*/
+.room-rail{
+  position:fixed;z-index:140;
+  right:8px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:7px 5px;border-radius:999px;
+  background:linear-gradient(180deg,rgba(26,34,14,.82),rgba(8,11,5,.82));
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 14px 34px -16px rgba(0,0,0,.85);
+}
+.room-here{
+  display:flex;align-items:center;gap:4px;
+  padding:3px 8px 5px;border-bottom:1px solid rgba(255,255,255,.10);
+  font-size:11px;font-weight:800;color:var(--text-inv);
+  font-variant-numeric:tabular-nums;
+}
+.room-here i{
+  width:6px;height:6px;border-radius:50%;background:var(--up);flex:none;
+  animation:ping 2.2s infinite;
+}
+/* One person in a room is not a crowd; say nothing rather than say "1 here". */
+.room-rail.alone .room-here i{background:#7d7d7d;animation:none;box-shadow:none}
+
+.room-btn{
+  width:32px;height:32px;border-radius:50%;
+  display:grid;place-items:center;font-size:16px;line-height:1;
+  background:transparent;border:0;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+  transition:transform .14s var(--ease),background .16s;
+}
+.room-btn:active{transform:scale(.86)}
+.room-btn.pop{animation:roompop .34s var(--ease-out) 1}
+@keyframes roompop{0%{transform:scale(1)}45%{transform:scale(1.32)}100%{transform:scale(1)}}
+
+/* The open mobile menu is the one thing that shares this strip of screen.
+   It wins: a reaction rail sitting on top of the navigation is worse than a
+   reaction rail you cannot see for the two seconds a menu is open. */
+.nav.open ~ .room-rail,
+.nav.open ~ .room-sky{opacity:0;pointer-events:none}
+.room-rail,.room-sky{transition:opacity .2s var(--ease)}
+
+/* where the emoji fly */
+.room-sky{position:fixed;inset:0;z-index:139;pointer-events:none;overflow:hidden}
+.room-fly{
+  position:absolute;bottom:8%;
+  will-change:transform,opacity;
+  animation:roomfly var(--dur,3s) cubic-bezier(.2,.5,.3,1) forwards;
+  filter:drop-shadow(0 3px 8px rgba(0,0,0,.45));
+}
+.room-fly.mine{filter:drop-shadow(0 0 10px rgba(168,220,43,.85))}
+@keyframes roomfly{
+  0%  {opacity:0;transform:translate3d(0,20px,0) scale(.5) rotate(0)}
+  12% {opacity:1;transform:translate3d(0,0,0) scale(1) rotate(0)}
+  100%{opacity:0;transform:translate3d(var(--drift,0),-62vh,0) scale(1.05) rotate(var(--spin,0))}
+}
+
+@media (hover:hover) and (pointer:fine){
+  .room-btn:hover{background:rgba(255,255,255,.12);transform:scale(1.12)}
+}
+@media (max-width:699px){
+  /* Stays vertically centred rather than dropping to the bottom. Down there it
+     lands on the contract-copy button and on the buy notifications — two
+     things you can tap — whereas the middle of the right edge is the one strip
+     of a phone screen with nothing interactive in it. */
+  .room-rail{right:5px;gap:2px;padding:6px 4px}
+  .room-btn{width:29px;height:29px;font-size:15px}
+  .room-here{font-size:10px;padding:2px 6px 4px}
+}
+@media (prefers-reduced-motion:reduce){
+  .room-fly{animation-duration:1.2s}
+}
+
 /* ═══════════════════════════════════════════════ mobile: cheaper glass ══ */
 /*
    backdrop-filter has to recompute whenever anything behind it changes, and

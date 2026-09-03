@@ -12,3 +12,4 @@ api/config.local.php
 .env.*
 shots/
 api/data/arena.sqlite*
+api/data/room.sqlite*

@@ -11,7 +11,7 @@ cp .htaccess dist/
 # The arena writes its database into api/data at runtime. Ship the folder and
 # its deny rule, never a local database.
 mkdir -p dist/api/data
-rm -f dist/api/data/arena.sqlite*
+rm -f dist/api/data/*.sqlite*
 
 # Cache-bust: stamp every stylesheet and script with this build's id, so a
 # re-upload is picked up immediately instead of being served from cache for an

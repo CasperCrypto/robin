@@ -178,6 +178,24 @@
       return passthroughOr(url, opts, function () { return J(SAMPLE_SCAN, 1800); });
     }
 
+    if (u.indexOf('api/room') > -1) {
+      // A preview with no PHP still shows a room, so the rail is not a dead
+      // control — but it invents a plausible crowd rather than claiming a real
+      // one, and says so through the sandbox badge like everything else here.
+      return passthroughOr(url, opts, function () {
+        var body = {}; try { body = JSON.parse(opts.body); } catch (e) {}
+        var pool = ['🚀', '🏹', '🐕', '💎', '🔥', '😂'];
+        var out = [];
+        if (body.since >= 0 && Math.random() < 0.55) {
+          for (var i = 0; i < 1 + ((Math.random() * 2) | 0); i++) {
+            out.push(pool[(Math.random() * pool.length) | 0]);
+          }
+        }
+        return J({ here: 9 + ((Math.random() * 5) | 0), reactions: out,
+                   cursor: (body.since || 0) + out.length, sent: !!body.react, emoji: pool }, 120);
+      });
+    }
+
     if (u.indexOf('api/arena') > -1) {
       // Joining a round is never faked: a sample "you're in" for an entry that
       // was never recorded would be a straight lie to the player.

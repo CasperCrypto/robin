@@ -309,6 +309,10 @@
 
   /* ------------------------------------------------------------- the payout */
   function win(pot) {
+    // The room listens for this and throws a shower of diamonds. Announcing it
+    // rather than reaching into room.js keeps the two features unaware of each
+    // other, so either can be removed without touching the other.
+    document.dispatchEvent(new CustomEvent('robin:win', { detail: { pot: pot } }));
     root.classList.add('won');
     setTimeout(function () { root.classList.remove('won'); }, 1400);
 

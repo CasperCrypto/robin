@@ -23,6 +23,7 @@ public_html/robin/
 ├── assets/
 └── api/
     ├── arena.php     ← the Arena round engine
+    ├── room.php      ← live presence and reactions
     ├── data/         ← the arena's database (created on first use)
     ├── scan.php      ← token scanner (no UI; still answers)
     ├── provider.php  ← your AI provider connection
@@ -129,6 +130,7 @@ twitterHandle    // handle only, no @, for the live timeline
 supplyFacts      // the tokenomics tiles
 swap.feePct      // total fee the Pons hook takes per swap (see below)
 arena.pollMs     // how often the arena refreshes (round length is server-side)
+room.pollMs      // presence cadence at rest; it halves while the room is busy
 ```
 
 ### `swap.feePct` — read this if you changed your creator fee
@@ -239,6 +241,43 @@ blocked by many privacy extensions and render nothing at all for a protected
 account. A follow card sits alongside them, and takes over entirely if X never
 loads. To change which posts appear, paste the numeric id from the end of a post
 URL into `tweets`, newest first.
+
+---
+
+## The room (live presence and reactions)
+
+The site used to be a page. This makes it a room: a head count that moves, and
+emoji that fly up the screen for everyone at once. On a memecoin site the first
+question a visitor silently asks is "is anything happening here", and a number
+that changes answers it better than any copy could.
+
+The rail sits on the right edge — the one strip of a phone screen with nothing
+tappable in it — and yields to the mobile menu when that opens. It reacts to
+the chain on its own too: a buy over $250 throws rockets, and a jackpot win
+showers diamonds, without anyone pressing anything.
+
+**One request per client per tick.** A poll carries the heartbeat, any
+reaction, and the cursor for what that client has already seen, and comes back
+with the head count and whatever is new. Presence over polling on shared
+hosting lives or dies on the request count. A background tab polls not at all,
+and the cadence drops from five seconds to two while the room is busy.
+
+**Reactions are an allowlist, not text.** Six emoji, fixed in `api/room.php`.
+Anything else is refused with a 400. There is no path from a stranger's
+keyboard to another visitor's screen, which is the only version of this feature
+worth shipping without a moderation queue.
+
+**Nobody is identified.** A client invents a random id for itself and keeps it
+in `localStorage`. No wallet, no address, no fingerprint — the head count is a
+count.
+
+Its database is `api/data/room.sqlite`, deliberately separate from the arena's:
+the arena rebuilds its own when its schema changes, and that should never take
+the room down with it.
+
+`test/room.test.js` runs two real browsers at once, because the only claim this
+feature makes is that what one person does reaches the other one, and a single
+browser can never show that.
 
 ---
 
@@ -422,6 +461,7 @@ What each one is for:
 | `discovery.test.sh` | Finds a provider whose root, auth header and request shape all differ from the defaults; a 400 advances the search, a 5xx is retried once |
 | `scan.test.sh` | The scanner's scoring against known token profiles: a clean token passes, a rug is called, and unreachable sources produce "could not check" rather than an accusation |
 | `arena.test.sh` | The jackpot engine on a controlled clock: allowances by tier, the daily limit, staking rules, resolution, points conservation, a one-player round returned — and an independent reimplementation of the fairness check |
+| `room.test.js` | Two browsers at once: a head count that rises, a reaction crossing from one to the other, arbitrary content refused, and a hidden tab that stops polling |
 | `arena-ui.test.js` | The arena in a browser against the real PHP — claiming, staking, the wheel matching the recorded entries, and over-staking refused by the server |
 | `motion.test.js` | Animations still run under `prefers-reduced-motion` (Android battery saver sets it), and the glass panels are static except when one arrives |
 | `buypop.test.js` | Buy notifications replay on load, exactly one is on screen at a time, and a silent chain shows nothing at all |
