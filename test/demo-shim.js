@@ -178,6 +178,17 @@
       return passthroughOr(url, opts, function () { return J(SAMPLE_SCAN, 1800); });
     }
 
+    if (u.indexOf('api/route') > -1) {
+      // The honest state today: providers answer, and none of them quote
+      // Solana into this chain.
+      return passthroughOr(url, opts, function () {
+        return J({ from: 'solana', toChain: 4663, status: 'none', via: [],
+                   providers: { lifi: { name: 'LI.FI', reachable: true, route: false,
+                                        status: 404, said: 'no route found for this pair' } },
+                   checkedAt: Math.floor(Date.now() / 1000) }, 220);
+      });
+    }
+
     if (u.indexOf('api/tokens') > -1 || u.indexOf('api/bridge') > -1) {
       // The preview cannot reach PHP, so it shows a plausible chain rather than
       // an empty picker — and reports the bridge as genuinely unavailable,

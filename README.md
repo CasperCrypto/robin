@@ -26,6 +26,7 @@ public_html/robin/
     ├── room.php      ← live presence and reactions
     ├── tokens.php    ← every tradable token on the chain
     ├── bridge.php    ← does anything bridge in yet?
+    ├── route.php     ← can Solana money actually get here?
     ├── data/         ← the arena's database (created on first use)
     ├── scan.php      ← token scanner (no UI; still answers)
     ├── provider.php  ← your AI provider connection
@@ -126,6 +127,7 @@ Everything you'd want to change is in **`assets/js/config.js`** — one commente
 The things worth setting before launch:
 
 ```js
+links.bridge     // the official Robinhood Chain bridge, for the Solana path
 links.*          // X, Telegram, DexScreener, Pons. Leave '' and the link is
                  // removed rather than left dead (github is empty by default)
 twitterHandle    // handle only, no @, for the live timeline
@@ -278,6 +280,41 @@ rules it follows:
   their wallet is how you lose the trader.
 - **Nothing is charged until `swap.feeRecipient` is set.** An uncollectable fee
   is just a worse price. It is capped at 3%.
+
+### Solana → Robinhood Chain
+
+Worth being precise about, because it is easy to get wrong: **Uniswap pools on
+Robinhood Chain solve the swap, not the bridge.** Solana and Robinhood Chain
+are different virtual machines and no single transaction spans them, so buying
+a Pons token with SOL is always two jobs — get value onto chain 4663, then swap
+it in the pool. The pools mean the second job is done. The first is the whole
+question.
+
+`api/route.php` answers it by asking for a real quote: one SOL into ETH on
+chain 4663, from LI.FI, Relay, deBridge and Mayan — the four that actually run
+Solana-to-EVM routes. A chain listing is the weaker question and can be true
+while no Solana path exists at all, so this asks the strong one.
+
+It reports three things, and the difference between the last two is why the
+file exists:
+
+| | what it means |
+|---|---|
+| `available` | somebody quoted it — one click is possible, and the panel leads with it |
+| `none` | everyone answered and nobody can, so the three-step path is the honest one |
+| `unknown` | nobody answered; never cached, because that is an outage and not a finding |
+
+When a provider says no, its **own words** are reported. "No route for this
+pair" and "unknown parameter toChain" both come back as a failure to quote, and
+they need completely different fixes — one is the chain not being wired up, the
+other is us asking wrongly. Folding them together would have the site tell
+every Solana holder to bridge by hand for months after the one-click route
+quietly started working.
+
+Until then the panel spells out the path that does work today: swap SOL for ETH
+on Ethereum or Base (Jumper and Mayan both do it), bring it across with the
+official bridge, then swap here. Put that bridge's URL in `links.bridge` and
+step two becomes a link.
 
 ### Bridging in — asked, not assumed
 
@@ -522,7 +559,7 @@ What each one is for:
 | `discovery.test.sh` | Finds a provider whose root, auth header and request shape all differ from the defaults; a 400 advances the search, a 5xx is retried once |
 | `scan.test.sh` | The scanner's scoring against known token profiles: a clean token passes, a rug is called, and unreachable sources produce "could not check" rather than an accusation |
 | `arena.test.sh` | The jackpot engine on a controlled clock: allowances by tier, the daily limit, staking rules, resolution, points conservation, a one-player round returned — and an independent reimplementation of the fairness check |
-| `market.test.sh` | The token list against a known chain, and the bridge probe's three answers kept distinct — including that silence is never mistaken for a no |
+| `market.test.sh` | The token list against a known chain, and both probes' three answers kept distinct — a real quote, a definite no in the provider's own words, a malformed request that is not a no, and silence that is never mistaken for one |
 | `exchange.test.js` | The picker in a browser: the chain listed deepest-first, search by name and address, the panel re-quoting for whatever is chosen, and a picked token refusing to route on-page |
 | `room.test.js` | Two browsers at once: a head count that rises, a reaction crossing from one to the other, arbitrary content refused, and a hidden tab that stops polling |
 | `arena-ui.test.js` | The arena in a browser against the real PHP — claiming, staking, the wheel matching the recorded entries, and over-staking refused by the server |

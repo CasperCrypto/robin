@@ -14,8 +14,10 @@ ck() { if [ "$2" = "$3" ]; then echo "PASS  $1"; pass=$((pass+1));
        else echo "FAIL  $1"; echo "      got:  $2"; echo "      want: $3"; fail=$((fail+1)); fi }
 j() { echo "$1" | python3 -c "import sys,json;d=json.load(sys.stdin);print($2)" 2>/dev/null || echo PARSE_ERROR; }
 
-start() { MOCK_BRIDGE="$1" php -S 127.0.0.1:$MOCK -t test test/mock-market.php >/dev/null 2>&1 & SRV=$!; sleep 1.2; }
-stop()  { kill $SRV 2>/dev/null; wait $SRV 2>/dev/null; }
+# One server for the whole run. Each case selects its behaviour with ?mode=,
+# rather than restarting on the same port between assertions.
+php -S 127.0.0.1:$MOCK -t test test/mock-market.php >/dev/null 2>&1 & SRV=$!
+sleep 1.2
 trap 'kill $SRV 2>/dev/null' EXIT
 
 run() { # $1 = script, rest = env
@@ -25,7 +27,6 @@ run() { # $1 = script, rest = env
 }
 
 # ── the token list ───────────────────────────────────────────────────────
-start no
 T=$(run api/tokens.php)
 ck "the list is built"            "$(j "$T" 'd["count"]')" "2"
 ck "the deepest market leads"     "$(j "$T" 'd["tokens"][0]["symbol"]')" "DEEP"
@@ -36,32 +37,57 @@ ck "so did liquidity"             "$(j "$T" 'int(d["tokens"][0]["liquidity"])')"
 ck "and the explorer's metadata"  "$(j "$T" 'd["tokens"][1]["name"]')" "Robin Nakamoto"
 ck "both sources are reported"    "$(j "$T" 'd["reached"]["explorer"] and d["reached"]["dexscreener"]')" "True"
 
-stop
 
 # ── the bridge probe ─────────────────────────────────────────────────────
 # The probe queries real aggregators, so point every provider at the stand-in.
-start no
-B=$(rm -f /tmp/robin_bridge.json; ROBIN_BRIDGE_URLS="http://127.0.0.1:$MOCK/chains" \
-     php -r "\$_GET=[];\$_SERVER['REQUEST_METHOD']='GET';include 'api/bridge.php';" 2>&1)
+bridge() { # $1 = what the aggregators should answer
+  rm -f /tmp/robin_bridge.json
+  ROBIN_BRIDGE_URLS="http://127.0.0.1:$MOCK/chains?mode=$1" \
+    php -r "\$_GET=[];\$_SERVER['REQUEST_METHOD']='GET';include 'api/bridge.php';" 2>&1
+}
+
+B=$(bridge no)
 ck "asked, and nobody bridges it" "$(j "$B" 'd["status"]')" "none"
 ck "no route is claimed"          "$(j "$B" 'len(d["via"])')" "0"
-stop
 
 # ── one aggregator lists it ──────────────────────────────────────────────
-start yes
-B=$(rm -f /tmp/robin_bridge.json; ROBIN_BRIDGE_URLS="http://127.0.0.1:$MOCK/chains" \
-     php -r "\$_GET=[];\$_SERVER['REQUEST_METHOD']='GET';include 'api/bridge.php';" 2>&1)
+B=$(bridge yes)
 ck "a listed chain is found"      "$(j "$B" 'd["status"]')" "available"
 ck "and the route is named"       "$(j "$B" 'len(d["via"]) > 0')" "True"
-stop
 
 # ── nobody answers ───────────────────────────────────────────────────────
-start down
-B=$(rm -f /tmp/robin_bridge.json; ROBIN_BRIDGE_URLS="http://127.0.0.1:$MOCK/chains" \
+rm -f /tmp/robin_bridge.json
+B=$(ROBIN_BRIDGE_URLS="http://127.0.0.1:9/chains" \
      php -r "\$_GET=[];\$_SERVER['REQUEST_METHOD']='GET';include 'api/bridge.php';" 2>&1)
 ck "silence is not a no"          "$(j "$B" 'd["status"]')" "unknown"
 ck "and silence is never cached"  "$([ -f /tmp/robin_bridge.json ] && echo yes || echo no)" "no"
-stop
+
+# ── can Solana money actually get here? ──────────────────────────────────
+# A chain being listed is not the same as the route existing, and "no route"
+# is not the same as "we asked you wrongly". All three have to stay separate.
+route() { # $1 = what the provider should answer
+  rm -f /tmp/robin_route.json
+  ROBIN_ROUTE_URLS="http://127.0.0.1:$MOCK/quote?mode=$1" \
+    php -r "\$_GET=[];\$_SERVER['REQUEST_METHOD']='GET';include 'api/route.php';" 2>&1
+}
+
+R=$(route yes)
+ck "a real quote proves the route"  "$(j "$R" 'd["status"]')" "available"
+ck "and the amount comes back"      "$(j "$R" 'd["providers"]["probe0"]["out"]')" "318400000000000000"
+
+R=$(route no)
+ck "no route is a definite no"      "$(j "$R" 'd["status"]')" "none"
+ck "in the provider's own words"    "$(j "$R" '"no route found" in d["providers"]["probe0"]["said"]')" "True"
+
+R=$(route bad)
+ck "a bad request is not a no"      "$(j "$R" 'd["providers"]["probe0"]["said"]')" "unknown parameter toChain"
+ck "…and is still reachable"        "$(j "$R" 'd["providers"]["probe0"]["reachable"]')" "True"
+
+rm -f /tmp/robin_route.json
+R=$(ROBIN_ROUTE_URLS="http://127.0.0.1:9/quote" \
+     php -r "\$_GET=[];\$_SERVER['REQUEST_METHOD']='GET';include 'api/route.php';" 2>&1)
+ck "silence is not a no"            "$(j "$R" 'd["status"]')" "unknown"
+ck "and is never cached"            "$([ -f /tmp/robin_route.json ] && echo yes || echo no)" "no"
 
 echo
 echo "$pass passed, $fail failed"

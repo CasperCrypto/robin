@@ -25,6 +25,7 @@
 
   var TOKENS = cfg.tokensEndpoint || 'api/tokens.php';
   var BRIDGE = cfg.bridgeEndpoint || 'api/bridge.php';
+  var ROUTE  = cfg.routeEndpoint || 'api/route.php';
 
   var $ = function (id) { return document.getElementById(id); };
   var pick = $('tokPick');
@@ -162,33 +163,77 @@
 
   /* ------------------------------------------------- how to fund the trade */
   /*
-     Everything on this chain is paid for in its own ETH, which a new buyer
-     will not have. What we are allowed to tell them depends entirely on
-     whether a bridge lists the chain, so ask the server and repeat only what
-     it actually found.
+     Everything on this chain is paid for in its own ETH, which somebody
+     arriving from Solana will not have. Uniswap pools on this chain solve the
+     swap; they do nothing about getting the money here, and that is the half
+     that is actually missing.
+
+     So two questions get asked of the server, and only what it found is
+     repeated. bridge.php asks whether any aggregator lists the chain at all.
+     route.php asks the stronger question — whether one will actually quote
+     Solana to here — because a chain can be listed for EVM traffic and have no
+     Solana path whatsoever.
   */
-  fetch(BRIDGE, { headers: { Accept: 'application/json' } })
-    .then(function (r) { return r.json(); })
-    .then(function (j) {
-      if (!els.fund) return;
-      var names = (j.via || []).map(function (k) {
-        return (j.providers[k] && j.providers[k].name) || k;
-      });
-      if (j.status === 'available' && names.length) {
-        els.fund.hidden = false;
-        els.fund.className = 'swap-fund ok';
-        els.fund.innerHTML = 'Coming from another chain? ' + RB.esc(names[0]) +
-          ' bridges straight into Robinhood Chain — no manual transfer needed.';
-        document.dispatchEvent(new CustomEvent('robin:bridge', { detail: j }));
-      } else if (j.status === 'none') {
-        els.fund.hidden = false;
-        els.fund.className = 'swap-fund';
-        els.fund.innerHTML = 'Need ETH on this chain? No aggregator bridges into Robinhood Chain yet, ' +
-          'so move it across with the official bridge first, then come back.';
-      }
-      // 'unknown' means nobody answered. Saying nothing beats guessing.
-    })
-    .catch(function () {});
+  function fundCard(html, kind) {
+    if (!els.fund) return;
+    els.fund.hidden = false;
+    els.fund.className = 'swap-fund' + (kind ? ' ' + kind : '');
+    els.fund.innerHTML = html;
+  }
+
+  function manualPath() {
+    var bridge = (C.links && C.links.bridge) || '';
+    var step2 = bridge
+      ? '<a href="' + RB.esc(bridge) + '" target="_blank" rel="noopener">the Robinhood Chain bridge</a>'
+      : 'the official Robinhood Chain bridge';
+    return '<b>Coming from Solana?</b>' +
+      '<span>Nothing bridges straight into this chain yet, so it is three steps ' +
+      'rather than one:</span>' +
+      '<ol class="fund-steps">' +
+        '<li>Swap SOL for ETH on Ethereum or Base — ' +
+          '<a href="https://jumper.exchange" target="_blank" rel="noopener">Jumper</a> ' +
+          'and <a href="https://app.mayan.finance" target="_blank" rel="noopener">Mayan</a> both do this.</li>' +
+        '<li>Move that ETH across with ' + step2 + '.</li>' +
+        '<li>Come back here and swap it for any token on the list.</li>' +
+      '</ol>' +
+      '<span class="fund-foot">This turns into one click the moment an aggregator lists the chain — ' +
+      'the site checks for itself and will switch over on its own.</span>';
+  }
+
+  Promise.all([
+    fetch(BRIDGE, { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); })
+      .catch(function () { return { status: 'unknown' }; }),
+    fetch(ROUTE, { headers: { Accept: 'application/json' } }).then(function (r) { return r.json(); })
+      .catch(function () { return { status: 'unknown' }; }),
+  ]).then(function (res) {
+    var bridge = res[0], route = res[1];
+
+    // The strongest claim first: somebody actually quoted Solana to here.
+    if (route.status === 'available' && (route.via || []).length) {
+      var who = (route.providers[route.via[0]] || {}).name || route.via[0];
+      fundCard('<b>Pay straight from Solana</b>' +
+        '<span>' + RB.esc(who) + ' quotes SOL into Robinhood Chain directly, so it is one ' +
+        'transaction and no manual bridging.</span>', 'ok');
+      document.dispatchEvent(new CustomEvent('robin:route', { detail: route }));
+      return;
+    }
+
+    // Next: the chain is listed somewhere, even if Solana is not wired to it.
+    if (bridge.status === 'available' && (bridge.via || []).length) {
+      var name = (bridge.providers[bridge.via[0]] || {}).name || bridge.via[0];
+      fundCard('<b>Bridging in works</b>' +
+        '<span>' + RB.esc(name) + ' bridges into Robinhood Chain. Solana is not quoted ' +
+        'directly yet, so come through Ethereum or Base.</span>', 'ok');
+      return;
+    }
+
+    // Both asked and both said no: give the path that genuinely works today.
+    if (bridge.status === 'none' || route.status === 'none') {
+      fundCard(manualPath());
+      return;
+    }
+    // Nobody answered either question. Saying nothing beats guessing.
+  });
 
   RB.exchange = { open: open, load: load, tokens: function () { return S.tokens; } };
 })();

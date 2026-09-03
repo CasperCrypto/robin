@@ -29,11 +29,12 @@ const portFree = port => new Promise(res => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ex-'));
   const env = { ...process.env, ROOM_DIR: dir, ARENA_DIR: dir, ROBIN_RATE_DIR: dir,
                 SCAN_EXPLORER: `http://127.0.0.1:${MOCK}/api/v2`, SCAN_DS: `http://127.0.0.1:${MOCK}/dex`,
-                ROBIN_BRIDGE_URLS: `http://127.0.0.1:${MOCK}/chains`, MOCK_BRIDGE: 'no' };
+                ROBIN_BRIDGE_URLS: `http://127.0.0.1:${MOCK}/chains?mode=no`,
+                ROBIN_ROUTE_URLS: `http://127.0.0.1:${MOCK}/quote?mode=no` };
   mock = spawn('php', ['-S', `127.0.0.1:${MOCK}`, '-t', 'test', 'test/mock-market.php'], { cwd: ROOT, env, stdio: 'ignore' });
   app  = spawn('php', ['-S', `127.0.0.1:${APP}`, '-t', '.'], { cwd: ROOT, env, stdio: 'ignore' });
   await new Promise(r => setTimeout(r, 1500));
-  ['robin_tokens.json', 'robin_bridge.json'].forEach(f => { try { fs.rmSync('/tmp/' + f); } catch (e) {} });
+  ['robin_tokens.json', 'robin_bridge.json', 'robin_route.json'].forEach(f => { try { fs.rmSync('/tmp/' + f); } catch (e) {} });
 
   const b = await chromium.launch({
     executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
@@ -115,8 +116,22 @@ const portFree = port => new Promise(res => {
   await p.waitForFunction(() => !document.getElementById('swapFund').hidden,
                           null, { timeout: 8000 }).catch(() => {});
   const fund = await p.textContent('#swapFund');
-  ck('the funding line is honest about bridging',
-     /No aggregator bridges into Robinhood Chain yet/.test(fund), fund);
+  ck('it names Solana as the problem', /Coming from Solana/.test(fund), fund.slice(0, 90));
+  ck('and gives the path that works today', /three steps/.test(fund), fund.slice(0, 120));
+  ck('with all three steps spelled out',
+     (await p.locator('.fund-steps li').count()) === 3);
+  ck('and says it will switch over on its own',
+     /switch over on its own/.test(fund));
+
+  // And when a provider does quote the route, the panel must lead with that
+  // instead of sending anyone off to bridge by hand.
+  const routed = await p.evaluate(async () => {
+    const r = await fetch('api/route.php?fresh=1');
+    return r.json();
+  });
+  ck('the prover reports the honest state', routed.status === 'none', JSON.stringify(routed.status));
+  ck('and repeats the provider’s own words',
+     /no route found/.test(JSON.stringify(routed.providers)), JSON.stringify(routed.providers).slice(0, 120));
 
   console.log(`\n${pass} passed, ${fail} failed`);
   await b.close();

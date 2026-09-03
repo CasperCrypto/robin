@@ -129,6 +129,7 @@ window.ROBIN = {
   exchange: {
     tokensEndpoint: 'api/tokens.php',
     bridgeEndpoint: 'api/bridge.php',
+    routeEndpoint:  'api/route.php',
     enabled: true
   },
 
@@ -172,6 +173,10 @@ window.ROBIN = {
     uniswap:   'https://app.uniswap.org/swap',
     // Chain slug the Uniswap app uses in its ?chain= parameter.
     uniswapChainSlug: 'robinhood',
+    /* The official Robinhood Chain bridge. Until an aggregator quotes Solana
+     * straight into the chain, this is step two of the only path that works,
+     * so the swap panel links to it — paste the real URL here. */
+    bridge:    '',
     github:    ''
   },
 
