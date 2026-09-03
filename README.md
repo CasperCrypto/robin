@@ -349,21 +349,36 @@ tan fur — and gets close from words alone.
 
 ### When it still will not draw
 
-The error now carries **the provider's own words**, because those name the fix
-and nothing else does:
+**The page tells you why.** A failed generation shows the provider's own words
+right there, with a **Copy details** button next to it that puts the whole
+picture on your clipboard — endpoint, auth style, shape, model, HTTP status and
+every attempt with its rejection:
 
-> Image generation was rejected. The provider said — responses: 400 model does
-> not support the tools parameter | chat: 404 no such route | images: 400
-> unknown model
+```
+$ROBIN meme forge — failure report
+error:  Image generation was rejected. responses: 400 model does not support
+        the tools parameter | images: 400 unknown model
+root:   https://api.example.com/v1
+shape:  responses
+model:  google/gemini-2.5-flash-image
+status: 400
+```
 
-Read it, then:
+You do not need to visit a diagnostic URL or read a log to find out what broke.
+
+A server error or a dropped connection is retried once, quietly, before anyone
+is told about it — those are usually blips, and a blip should not surface as an
+error at all.
+
+Then:
 
 - **"model not found"** → `ai.model` in `assets/js/config.js` names something
-  your provider does not serve. The self-test lists what your key can reach.
+  your provider does not serve.
 - **"does not support tools"** / **"unknown parameter"** → that model is
   text-only. You need one that outputs images.
 - **every shape 404s** → this provider may not offer image generation at all,
-  in which case no configuration will help.
+  in which case no configuration will help. Point `ROBIN_AI_ROOTS` at one that
+  does; no code change needed.
 
 `api/ai.php?selftest=1&image=1` walks all three and prints each response in full.
 

@@ -1056,3 +1056,12 @@ body.bar-up .buypop-wrap{bottom:calc(80px + env(safe-area-inset-bottom))}
   .buypop-wrap,
   body.bar-up .buypop-wrap{left:20px;right:auto;bottom:20px;width:310px}
 }
+
+/* one-click failure report, for whoever runs the site */
+.note-copy{
+  display:inline-block;margin-top:8px;padding:7px 13px;border-radius:9px;
+  font-size:11.5px;font-weight:700;
+  background:var(--gd-fill-hi);border:1px solid var(--gd-rim);color:var(--text-inv-soft);
+  transition:.16s;
+}
+.note-copy:hover{background:var(--lime-400);border-color:var(--lime-400);color:var(--ink)}

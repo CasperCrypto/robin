@@ -63,9 +63,16 @@ const RATE_MAX   = 8;      // image calls…
 const RATE_WINDOW= 600;    // …per this many seconds, per IP
 const TIMEOUT    = 120;
 
-function fail(int $code, string $msg): void {
+/**
+ * `detail` is for whoever runs the site: the provider's own words, the endpoint
+ * that was tried, what came back. It is shown behind a button rather than in
+ * the visitor's face, and describes our own request rather than anyone's data.
+ */
+function fail(int $code, string $msg, array $detail = []): void {
     http_response_code($code);
-    echo json_encode(['error' => $msg]);
+    $out = ['error' => $msg];
+    if ($detail) $out['detail'] = $detail;
+    echo json_encode($out);
     exit;
 }
 
@@ -654,7 +661,8 @@ if (is_readable($bucket)) {
 }
 $hits = array_values(array_filter($hits, fn($t) => is_int($t) && $t > $now - RATE_WINDOW));
 if (count($hits) >= RATE_MAX) {
-    fail(429, 'That is a lot of memes. Give it a couple of minutes.');
+    fail(429, 'That is a lot of memes. Give it a couple of minutes.',
+              ['limit' => 'this site, ' . RATE_MAX . ' per ' . RATE_WINDOW . 's per visitor']);
 }
 
 $body = json_decode((string)file_get_contents('php://input'), true);
@@ -760,22 +768,41 @@ foreach (shapeOrder($ep['shape']) as $shape) {
     if ($code === 429 || $code >= 500) break;
 }
 
-if ($rawBody === false) fail(502, 'Could not reach the image service: ' . $cerr);
+/* A 5xx or a timeout is usually a blip. Wait a moment and go once more with
+   the same shape before bothering anyone about it. */
+if ($rawBody === false || $code >= 500) {
+    sleep(2);
+    [$code, $j, $rawBody, $cerr] = attempt($ep, $key, $model, $style, $ref);
+    if ($code === 200 && extractImage(is_array($j) ? $j : [])) {
+        $attempts[] = 'recovered on retry';
+    }
+}
+
+$ctx = [
+    'root' => $ep['root'], 'auth' => $ep['auth'], 'shape' => $ep['shape'],
+    'model' => $model, 'status' => $code, 'attempts' => $attempts,
+];
+
+if ($rawBody === false) {
+    fail(502, 'Could not reach the image service.', $ctx + ['curl' => $cerr]);
+}
 
 if ($code !== 200) {
-    if ($code === 429) fail(429, 'The image service is rate-limiting us. Try again shortly.');
-    if ($code === 401 || $code === 403) {
-        fail(502, 'The image service refused the request. (Owner: run '
-                . 'api/ai.php?selftest=1&probe=1.)');
+    if ($code === 429) {
+        fail(429, 'Your provider is rate-limiting us. Wait a minute and try again.', $ctx);
     }
-    if ($code >= 500) fail(502, 'The image service is having trouble. Try again in a moment.');
+    if ($code === 401 || $code === 403) {
+        fail(502, 'The image service refused the request.', $ctx);
+    }
+    if ($code >= 500) {
+        fail(502, 'Your provider returned a server error, twice. It may be down.', $ctx);
+    }
 
     /* A 4xx here is a configuration problem — a model that cannot draw, an
        unsupported parameter, a name the provider does not know. Those messages
        name the fix, so pass them through rather than hiding them behind
        something vague. They describe our own request, not anyone's data. */
-    fail(502, 'Image generation was rejected. The provider said — ' .
-              implode(' | ', $attempts));
+    fail(502, 'Image generation was rejected. ' . implode(' | ', $attempts), $ctx);
 }
 
 // ── pull the image out of the response ────────────────────────────────────
@@ -794,8 +821,10 @@ if (!$url) {
     $said = is_string($msg['content'] ?? null) ? trim($msg['content']) : '';
     error_log('[robin-forge] no image in response; text was: ' . mb_substr($said, 0, 300));
     fail(502, $said !== ''
-        ? 'That model replied with text instead of an image. Point ai.model at an image model.'
-        : 'No image came back. Try a different scene.');
+        ? 'That model replied with words instead of a picture — it is a text model. '
+          . 'Point ai.model at one that outputs images.'
+        : 'No image came back.',
+        ($ctx ?? []) + ['replied' => mb_substr($said, 0, 300)]);
 }
 
 echo json_encode(['image' => $url, 'model' => $j['model'] ?? MODEL], JSON_UNESCAPED_SLASHES);

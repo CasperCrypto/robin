@@ -70,12 +70,45 @@
     chips.appendChild(b);
   });
 
-  function showError(msg) {
+  /**
+   * Failures carry a `detail` object meant for whoever runs the site. Rather
+   * than make them dig it out of a diagnostic URL, put a one-click copy button
+   * right here — the whole point is that the person who can fix it should not
+   * have to go hunting for what to fix.
+   */
+  function showError(msg, detail) {
     setState('idle');
     idle.hidden = false;
     load.hidden = true;
-    note.textContent = msg;
     note.classList.add('err');
+    note.textContent = msg;
+
+    if (!detail) return;
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'note-copy';
+    btn.textContent = 'Copy details';
+    btn.addEventListener('click', function () {
+      var report = [
+        '$ROBIN meme forge — failure report',
+        'when:   ' + new Date().toISOString(),
+        'page:   ' + location.href,
+        'error:  ' + msg
+      ].concat(Object.keys(detail).map(function (k) {
+        var v = detail[k];
+        return (k + ':').padEnd(8) + (Array.isArray(v) ? v.join('\n         ') : v);
+      })).join('\n');
+
+      var done = function () {
+        btn.textContent = 'Copied — paste it to whoever set this up';
+        setTimeout(function () { btn.textContent = 'Copy details'; }, 4000);
+      };
+      if (navigator.clipboard) navigator.clipboard.writeText(report).then(done, done);
+      else done();
+    });
+    note.appendChild(document.createTextNode(' '));
+    note.appendChild(btn);
   }
 
   function resetNote() {
@@ -106,7 +139,11 @@
     })
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (j) {
-          if (!r.ok) throw new Error(j.error || ('Request failed (' + r.status + ')'));
+          if (!r.ok) {
+            var err = new Error(j.error || ('Request failed (' + r.status + ')'));
+            err.detail = j.detail;
+            throw err;
+          }
           if (!j.image) throw new Error('No image came back. Try a different scene.');
           // The value ends up in img.src and an <a href>, so accept image
           // schemes only — never javascript: or data:text/html.
@@ -133,7 +170,7 @@
         setState('done');
         wireActions(src, prompt);
       })
-      .catch(function (e) { showError(e.message || 'Something went wrong.'); })
+      .catch(function (e) { showError(e.message || 'Something went wrong.', e.detail); })
       .finally(function () {
         busy = false;
         stopLines();

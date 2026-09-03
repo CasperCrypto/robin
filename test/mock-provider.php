@@ -17,6 +17,14 @@ $hdrs   = array_change_key_case(getallheaders(), CASE_LOWER);
 $ok     = ($hdrs['x-api-key'] ?? '') === 'GOODKEY';
 $shape  = getenv('MOCK_SHAPE') ?: 'responses';
 
+// 'fail500' makes every generation attempt return a server error, so the
+// retry-then-report path can be exercised.
+if ($shape === 'fail500' && $path !== '/v1/models' && $method === 'POST') {
+    http_response_code(503);
+    echo '{"error":{"message":"upstream capacity exceeded"}}';
+    exit;
+}
+
 header('Content-Type: application/json');
 if (!$ok) { http_response_code(401); echo '{"error":{"message":"bad auth"}}'; exit; }
 

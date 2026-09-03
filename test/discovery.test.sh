@@ -64,6 +64,33 @@ ck "falls through a 400 to the shape that works" "$G" "yes"
 echo "$OUT3" | grep -q "does not support the tools parameter" && H=yes || H=no
 ck "shows the provider's own rejection" "$H" "yes"
 
+# ── transient upstream failure ───────────────────────────────────────────
+# A 5xx gets one quiet retry, then a report carrying the provider's own words
+# rather than a shrug. This is what "try again in a moment" used to hide.
+kill $MOCK 2>/dev/null; sleep 0.5
+MOCK_SHAPE=fail500 php -S 127.0.0.1:$PORT -t test test/mock-provider.php >/dev/null 2>&1 &
+MOCK=$!
+sleep 1.5
+rm -f /tmp/robin_endpoint.json
+
+OUT4=$(ROBIN_AI_KEY=GOODKEY ROBIN_AI_ROOTS="http://127.0.0.1:$PORT/v1" \
+  timeout 60 php -r '
+    $_SERVER["REQUEST_METHOD"]="POST"; $_SERVER["REMOTE_ADDR"]="5.5.5.5";
+    $GLOBALS["__b"]=json_encode(["prompt"=>"a test scene"]);
+    class In{ public $context; private $d; private $p=0;
+     function stream_open($a,$b,$c,&$d){ $this->d=$GLOBALS["__b"]; return true; }
+     function stream_read($n){ $r=substr($this->d,$this->p,$n); $this->p+=strlen($r); return $r; }
+     function stream_eof(){ return $this->p>=strlen($this->d);} function stream_stat(){return [];} }
+    stream_wrapper_unregister("php"); stream_wrapper_register("php","In");
+    include "api/ai.php";' 2>/dev/null)
+
+echo "$OUT4" | grep -q "server error, twice" && I=yes || I=no
+ck "a 5xx is retried before reporting" "$I" "yes"
+echo "$OUT4" | grep -q "upstream capacity exceeded" && J=yes || J=no
+ck "the report quotes the provider" "$J" "yes"
+echo "$OUT4" | grep -q '"detail"' && K=yes || K=no
+ck "the report is machine-readable for the copy button" "$K" "yes"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
