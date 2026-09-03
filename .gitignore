@@ -10,3 +10,4 @@ api/config.php
 api/config.local.php
 .env
 .env.*
+shots/

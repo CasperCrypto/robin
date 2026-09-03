@@ -1,13 +1,14 @@
 /* ============================================================================
    buypop.js — buy notifications.
 
-   Every buy that lands pops up in the corner: how much, what it cost, who.
-   On arrival the recent ones replay one at a time, so the page opens with
-   proof that people are buying rather than a static number.
+   One at a time, along the bottom of the screen: it rises, says what happened,
+   and leaves before the next one arrives. A queue rather than a stack, because
+   three cards fighting for the same corner reads as clutter, and a single card
+   arriving on a beat reads as momentum.
 
-   Deliberately restrained about it: a handful on load, then only real ones,
-   never more than a few on screen, and nothing at all if there is nothing to
-   show. An empty feed is silent, not a fake one.
+   Deliberately restrained: a handful replayed on load, then only real buys,
+   and nothing at all if there is nothing to show. An empty feed is silent,
+   not a fake one.
    ========================================================================== */
 (function () {
   'use strict';
@@ -16,10 +17,11 @@
 
   if (cfg.enabled === false) return;
 
-  var REPLAY_COUNT = cfg.replay == null ? 5 : cfg.replay;   // shown on load
-  var REPLAY_GAP   = cfg.gapMs  == null ? 1900 : cfg.gapMs; // between them
-  var HOLD_MS      = cfg.holdMs == null ? 6500 : cfg.holdMs;
-  var MAX_ON_SCREEN = 3;
+  var REPLAY_COUNT = cfg.replay == null ? 6 : cfg.replay;    // shown on load
+  var HOLD_MS      = cfg.holdMs == null ? 3400 : cfg.holdMs; // time on screen
+  var GAP_MS       = cfg.gapMs  == null ? 620  : cfg.gapMs;  // empty beat between
+  var IN_MS = 460, OUT_MS = 380;                             // matches the CSS
+  var QUEUE_MAX = 12;                                        // don't hoard a backlog
 
   var wrap = document.createElement('div');
   wrap.className = 'buypop-wrap';
@@ -45,49 +47,55 @@
     return '';
   }
 
-  function show(row) {
-    // Never let them pile up; drop the oldest instead.
-    while (wrap.children.length >= MAX_ON_SCREEN) {
-      wrap.removeChild(wrap.firstChild);
-    }
+  /* ------------------------------------------------------------ the queue */
+  var queue = [], showing = false;
 
+  function push(row) {
+    if (queue.length >= QUEUE_MAX) queue.shift();   // keep the newest
+    queue.push(row);
+    pump();
+  }
+
+  function pump() {
+    if (showing || !queue.length) return;
+    showing = true;
+    render(queue.shift(), function () {
+      showing = false;
+      setTimeout(pump, GAP_MS);
+    });
+  }
+
+  function render(row, done) {
     var price = RB.market.state.priceUsd;
     var usd = price ? row.amount * price : null;
 
-    var el = document.createElement('a');
+    var el = document.createElement('div');
     el.className = 'buypop' + tier(usd);
-    el.href = RB.scan('tx', row.tx);
-    el.target = '_blank';
-    el.rel = 'noopener';
     el.innerHTML =
       '<span class="bp-emo">' + creature(usd) + '</span>' +
       '<span class="bp-body">' +
-        '<span class="bp-top">New buy' +
-          (usd ? ' <b>' + RB.esc(RB.usd(usd, { money: true })) + '</b>' : '') +
-        '</span>' +
+        '<span class="bp-top">New buy</span>' +
         '<span class="bp-amt">+' + RB.esc(RB.num(row.amount)) + ' $ROBIN</span>' +
-        '<span class="bp-sub">' + RB.esc(RB.shortAddr(row.who)) +
-          ' · ' + RB.esc(RB.ago(row.at)) + ' ago</span>' +
-      '</span>';
+      '</span>' +
+      (usd ? '<span class="bp-usd">' + RB.esc(RB.usd(usd, { money: true })) + '</span>' : '');
 
     wrap.appendChild(el);
 
-    // Let the element land before animating, so the transition actually runs.
-    requestAnimationFrame(function () { el.classList.add('in'); });
+    // Two frames: one for the element to land in the layout, one so the
+    // starting transform is the browser's last committed value. Without the
+    // second, the transition sometimes has nothing to animate from.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { el.classList.add('in'); });
+    });
 
-    var gone = false;
-    var dismiss = function () {
-      if (gone) return;
-      gone = true;
+    setTimeout(function () {
       el.classList.remove('in');
       el.classList.add('out');
-      setTimeout(function () { if (el.parentNode) el.remove(); }, 420);
-    };
-    var timer = setTimeout(dismiss, HOLD_MS);
-
-    // Hovering holds it open; it is a link, and links get read.
-    el.addEventListener('mouseenter', function () { clearTimeout(timer); });
-    el.addEventListener('mouseleave', function () { timer = setTimeout(dismiss, 1800); });
+      setTimeout(function () {
+        if (el.parentNode) el.remove();
+        done();
+      }, OUT_MS);
+    }, IN_MS + HOLD_MS);
   }
 
   /* ------------------------------------------------------------- lifecycle */
@@ -98,15 +106,12 @@
     replayed = true;
     var rows = RB.feed.recent(REPLAY_COUNT);
     if (!rows.length) return;                 // nothing real to show, so nothing
-
     // Oldest first, so the sequence reads forwards.
-    rows.slice().reverse().forEach(function (row, i) {
-      setTimeout(function () { show(row); }, 900 + i * REPLAY_GAP);
-    });
+    rows.slice().reverse().forEach(push);
   }
 
   if (RB.feed) {
-    RB.feed.onBuy(show);                       // live ones, as they land
+    RB.feed.onBuy(push);                       // live ones, as they land
     RB.feed.ready().then(replay);              // and the recent ones on arrival
   }
 })();

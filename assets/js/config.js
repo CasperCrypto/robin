@@ -52,14 +52,16 @@ window.ROBIN = {
     // browser so the feed keeps history through reloads and quiet spells.
     feedRows: 12,
 
-    /* Corner notifications for buys. On load the recent ones replay one at a
-     * time, then live ones appear as they land. Nothing is shown if there are
-     * no real buys to show. */
+    /* Buy notifications along the bottom of the screen — one at a time, never
+     * a stack. On load the recent ones replay in sequence, then live ones
+     * appear as they land. Nothing is shown if there are no real buys.
+     * holdMs is how long one stays put; gapMs is the empty beat after it
+     * leaves, before the next rises. */
     popups: {
       enabled: true,
-      replay: 5,        // how many to replay when the page opens
-      gapMs: 1900,      // spacing between replayed ones
-      holdMs: 6500      // how long each stays up
+      replay: 6,        // how many to replay when the page opens
+      gapMs: 620,       // empty beat between them
+      holdMs: 3400      // how long each stays up
     }
   },
 

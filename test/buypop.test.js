@@ -1,5 +1,6 @@
-/* The buy notifications: they replay on load, they arrive live, they never
-   stack up, and a chain with no buys produces silence rather than theatre. */
+/* The buy notifications: they replay on load, they arrive live, exactly one is
+   ever on screen, and a chain with no buys produces silence rather than
+   theatre. */
 const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
 const shim = fs.readFileSync(path.join(__dirname, 'demo-shim.js'), 'utf8');
@@ -25,19 +26,26 @@ const ck = (n, c, x = '') => { c ? pass++ : fail++; console.log(`${c ? 'PASS' : 
   const first = await p.evaluate(() => ({
     shown: document.querySelectorAll('.buypop').length,
     text: document.querySelector('.buypop')?.textContent.replace(/\s+/g, ' ').trim(),
-    href: document.querySelector('.buypop')?.getAttribute('href') || '',
+    links: document.querySelectorAll('.buypop a, a.buypop').length,
     animated: document.querySelectorAll('.buypop.in').length,
   }));
   ck('a notification appears on load', first.shown > 0, JSON.stringify(first));
   ck('it animates in', first.animated > 0, 'in=' + first.animated);
   ck('it reads as a buy', /New buy/i.test(first.text || '') && /\$ROBIN/.test(first.text || ''), first.text);
-  ck('it links to the transaction', /\/tx\/0x/.test(first.href), first.href);
+  ck('it shows what it cost', /\$[\d.,]/.test(first.text || ''), first.text);
+  // A dopamine hit, not a receipt: no hashes, no addresses, nothing to read.
+  ck('it carries no transaction link', first.links === 0, 'links=' + first.links);
+  ck('it shows no address or hash', !/0x[0-9a-f]{4}/i.test(first.text || ''), first.text);
   await p.screenshot({ path: process.argv[2] + '/buypop.png' });
 
-  // they replay one at a time, and never pile up
-  await p.waitForTimeout(4200);
-  const later = await p.evaluate(() => document.querySelectorAll('.buypop').length);
-  ck('never more than three on screen', later <= 3, 'on screen=' + later);
+  // They replay one at a time. Sample across the whole replay rather than once,
+  // because a stack would only be visible while two of them overlap.
+  let peak = 0;
+  for (let i = 0; i < 40; i++) {
+    peak = Math.max(peak, await p.evaluate(() => document.querySelectorAll('.buypop').length));
+    await p.waitForTimeout(200);
+  }
+  ck('only ever one on screen', peak <= 1, 'peak=' + peak);
 
   const total = await p.evaluate(() => window.__popCount || 0);
   ck('no page errors', errs.length === 0, errs.join(' | '));

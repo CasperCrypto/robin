@@ -56,6 +56,9 @@ const PATH_MODELS    = '/models';
 const API_SHAPE = 'auto';
 
 const MODEL      = 'google/gemini-2.5-flash-image';
+
+/** Model used for written analysis. Any capable text model your key can reach. */
+const AI_TEXT_MODEL = 'anthropic/claude-sonnet-4.5';
 const REF_IMAGE  = __DIR__ . '/../assets/img/robin-logo.png';
 
 const MAX_PROMPT = 400;
@@ -647,6 +650,11 @@ function extractImage(array $j): ?string {
     if (!empty($j['data'][0]['url']))      return $j['data'][0]['url'];
     return null;
 }
+
+/* When another endpoint requires this file it wants the helpers above and
+   nothing else — no rate limiting, no reading a request body, no upstream
+   call. Everything below this line is the meme-forge endpoint proper. */
+if (defined('ROBIN_LIB_ONLY')) return;
 
 // ── method, rate limit, input ─────────────────────────────────────────────
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') fail(405, 'POST only');

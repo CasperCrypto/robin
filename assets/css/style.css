@@ -90,21 +90,29 @@ body{
 body::before{
   content:'';position:fixed;inset:-30%;z-index:-2;pointer-events:none;
   background:
+    /* Fine grain on top of the mesh, so large flat areas have texture instead
+       of banding. It rides on this layer rather than a second fixed one of its
+       own: every glass panel has to composite its backdrop through whatever is
+       back here, and one full-screen layer is meaningfully cheaper than two.
+       It is a pre-rendered tile for the same reason — an inline feTurbulence
+       has to be re-rasterized each time the layer is composited. */
+    url("../img/grain.png") repeat 0 0 / 128px 128px,
     radial-gradient(38% 32% at 22% 16%, rgba(233,255,168,.95), transparent 62%),
     radial-gradient(34% 30% at 82% 26%, rgba(255,255,255,.62), transparent 60%),
     radial-gradient(44% 38% at 68% 78%, rgba(120,190,20,.55), transparent 64%),
     radial-gradient(36% 30% at 12% 84%, rgba(198,244,110,.7), transparent 62%);
   animation:drift 26s var(--ease) infinite alternate;
+  will-change:transform,opacity;
 }
-/* Fine grain, so large flat areas have texture instead of banding. */
-body::after{
-  content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.32;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.42'/%3E%3C/svg%3E");
-}
+/* Translate and fade only — no scale. This layer is 160% of the viewport in
+   both directions and full of radial gradients; animating its scale makes the
+   engine re-rasterize all of it, repeatedly, which is felt everywhere else on
+   the page. Translation and opacity are pure compositor work, and the slow
+   fade gives back the breathing that the scale used to. */
 @keyframes drift{
-  0%  {transform:translate3d(0,0,0) scale(1)}
-  50% {transform:translate3d(2%,-2%,0) scale(1.06)}
-  100%{transform:translate3d(-2%,2%,0) scale(1.02)}
+  0%  {transform:translate3d(0,0,0);opacity:.9}
+  50% {transform:translate3d(3.5%,-3%,0);opacity:1}
+  100%{transform:translate3d(-3.5%,3%,0);opacity:.94}
 }
 
 img{max-width:100%;display:block}
@@ -159,13 +167,24 @@ input{font:inherit;color:inherit}
   overflow:hidden;
   isolation:isolate;
 }
-/* travelling specular */
+/* Travelling specular — a narrow bar that slides across, once, as the panel
+   arrives on screen.
+   Two decisions here, both measured rather than guessed:
+   1. A moving box, not an animated background-position. Same picture; only
+      this one is a transform the compositor can run on its own.
+   2. Once per panel, not a loop. These panels carry a backdrop-filter, and
+      anything animating inside one forces the engine to re-blur everything
+      behind it, every frame, on every panel at once. On a throttled phone
+      that single loop accounted for roughly three quarters of the dropped
+      frames on the page. Firing it as the panel appears looks better anyway:
+      the glass catches the light when it arrives, then holds still. */
 .lg::before{
-  content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
-  background:linear-gradient(108deg,transparent 34%,rgba(255,255,255,.55) 48%,transparent 62%);
-  background-size:260% 100%;background-position:200% 0;
-  animation:sweep 9s var(--ease) infinite;
+  content:'';position:absolute;top:-25%;bottom:-25%;left:0;width:55%;
+  z-index:0;pointer-events:none;
+  background:linear-gradient(108deg,transparent,rgba(255,255,255,.55) 50%,transparent);
+  transform:translate3d(-200%,0,0);
 }
+.lg.lit::before{animation:sweep-once 1.6s var(--ease-out) 1}
 /* Top gloss, the bit that sells it as a curved surface.
    Full height with the gradient fading out by half way — a half-height box
    would inherit the radius on its bottom corners too and draw a visible seam
@@ -177,7 +196,12 @@ input{font:inherit;color:inherit}
 }
 .lg > *{position:relative;z-index:1}
 
-@keyframes sweep{0%,72%{background-position:200% 0}100%{background-position:-80% 0}}
+/* Off-stage at both ends, so the start and the end are never seen. */
+@keyframes sweep{0%,72%{transform:translate3d(-200%,0,0)}100%{transform:translate3d(320%,0,0)}}
+@keyframes sweep-once{from{transform:translate3d(-200%,0,0)}to{transform:translate3d(320%,0,0)}}
+/* The text-clipped variant, for the one place a moving box will not do:
+   background-clip:text can only travel by moving its own background. */
+@keyframes sweep-bg{0%,72%{background-position:210% 0}100%{background-position:-90% 0}}
 
 .lg-d{
   background:linear-gradient(150deg,var(--gd-fill-hi),var(--gd-fill) 52%,rgba(255,255,255,.03));
@@ -190,7 +214,7 @@ input{font:inherit;color:inherit}
     inset 0 -1px 0 rgba(255,255,255,.05),
     0 18px 44px -22px rgba(0,0,0,.9);
 }
-.lg-d::before{background:linear-gradient(108deg,transparent 36%,rgba(255,255,255,.13) 48%,transparent 60%)}
+.lg-d::before{background:linear-gradient(108deg,transparent,rgba(255,255,255,.16) 50%,transparent)}
 .lg-d::after{background:linear-gradient(to bottom,rgba(255,255,255,.07) 0%,rgba(255,255,255,0) 52%)}
 
 /* A flat variant for lists that shouldn't read as lifted objects. */
@@ -252,7 +276,10 @@ input{font:inherit;color:inherit}
   background-size:280% 100%;background-position:210% 0;
   -webkit-background-clip:text;background-clip:text;
   color:transparent;-webkit-text-fill-color:transparent;
-  animation:sweep 7s var(--ease) infinite 1.2s;
+  /* Its own layer, so the one unavoidable repaint on the page is confined to
+     the six letters and never reaches the hero behind them. */
+  transform:translateZ(0);
+  animation:sweep-bg 7s var(--ease) infinite 1.2s;
 }
 
 /* ---------------------------------------------------------------- motion */
@@ -323,17 +350,24 @@ h2.sec-title{font-size:clamp(31px,8vw,58px);margin:14px 0 12px}
   padding:15px 22px;border-radius:999px;
   font-weight:700;font-size:15px;letter-spacing:-.012em;white-space:nowrap;
   overflow:hidden;isolation:isolate;
-  transition:transform .18s var(--ease),box-shadow .18s var(--ease),background .18s,opacity .18s;
+  /* transform / filter / opacity only. `background` and `box-shadow` were in
+     here too, and transitioning either repaints the button on every frame of
+     every hover — over a backdrop that is itself moving. */
+  transition:transform .18s var(--ease),filter .18s var(--ease),opacity .18s var(--ease);
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;
 }
-.btn:active{transform:scale(.97)}
+.btn:active{transform:scale(.96)}
 .btn[disabled],.btn[aria-disabled="true"]{opacity:.45;pointer-events:none}
 .btn svg{width:17px;height:17px;flex:none}
 
-/* a shine that crosses the primary button on an interval */
+/* A shine that crosses the primary button on an interval — again a sliding
+   bar, not a moving background, so a button at rest costs nothing to animate. */
 .btn-lime::after,.btn-dark::after{
-  content:'';position:absolute;inset:0;z-index:-1;
-  background:linear-gradient(104deg,transparent 40%,rgba(255,255,255,.30) 50%,transparent 60%);
-  background-size:250% 100%;background-position:200% 0;
+  content:'';position:absolute;top:-40%;bottom:-40%;left:0;width:50%;z-index:-1;
+  background:linear-gradient(104deg,transparent,rgba(255,255,255,.32) 50%,transparent);
+  transform:translate3d(-200%,0,0);
   animation:sweep 11s var(--ease) infinite 3s;
 }
 .btn-dark{background:var(--ink);color:var(--lime-400);box-shadow:0 8px 22px -8px rgba(0,0,0,.72)}
@@ -802,8 +836,7 @@ body.has-buybar .foot{padding-bottom:calc(26px + 70px + env(safe-area-inset-bott
 /* ═══════════════════════════════════════════════════════════ pointer/hover */
 @media (hover:hover) and (pointer:fine){
   .btn:hover{transform:translateY(-2px)}
-  .btn-glass:hover{background:rgba(255,255,255,.6)}
-  .btn-lime:hover{filter:brightness(1.05)}
+  .btn-glass:hover,.btn-lime:hover,.btn-dark:hover{filter:brightness(1.07)}
   .ca-copy:hover{transform:scale(1.08)}
   .flip button:hover{background:#26311a;transform:rotate(180deg)}
   .slip button:hover,.presets button:hover,.ai-chips button:hover,.ai-tab:hover{
@@ -990,50 +1023,58 @@ body.has-buybar .foot{padding-bottom:calc(26px + 70px + env(safe-area-inset-bott
 /* ══════════════════════════════════════════════════════ buy notifications */
 .buypop-wrap{
   position:fixed;z-index:150;
-  left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom));
-  display:flex;flex-direction:column;gap:8px;
+  left:0;right:0;bottom:calc(18px + env(safe-area-inset-bottom));
+  display:flex;justify-content:center;
+  padding:0 12px;
   pointer-events:none;
-  transition:bottom .3s var(--ease);
+  transition:transform .3s var(--ease);
 }
-/* lift clear of the sticky buy bar while it is showing */
-body.bar-up .buypop-wrap{bottom:calc(80px + env(safe-area-inset-bottom))}
+/* lift clear of the sticky buy bar while it is showing.
+   Transform rather than `bottom`, so the shift is a compositor job and does
+   not relayout the card mid-animation. */
+body.bar-up .buypop-wrap{transform:translate3d(0,-62px,0)}
 
 .buypop{
   display:flex;align-items:center;gap:12px;
-  padding:11px 14px;border-radius:var(--r-md);
-  background:linear-gradient(150deg,rgba(26,34,14,.96),rgba(8,11,5,.96));
+  max-width:340px;width:100%;
+  padding:11px 14px;border-radius:16px;
+  background:linear-gradient(150deg,rgba(26,34,14,.97),rgba(8,11,5,.97));
   border:1px solid rgba(168,220,43,.34);
-  box-shadow:0 16px 40px -16px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.09);
-  backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);
-  color:var(--text-inv);pointer-events:auto;overflow:hidden;
-  /* start off-stage; .in brings it home */
-  opacity:0;transform:translateX(-24px) scale(.94);
-  transition:opacity .34s var(--ease-out),transform .42s var(--ease-out);
+  box-shadow:0 18px 44px -18px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.09);
+  color:var(--text-inv);overflow:hidden;
+  /* Only opacity and transform are animated — both run on the compositor, so
+     the card cannot stutter no matter what else the page is doing. */
+  opacity:0;transform:translate3d(0,26px,0) scale(.94);
+  transition:opacity .3s var(--ease-out),transform .46s var(--ease-out);
 }
-.buypop.in{opacity:1;transform:none}
-.buypop.out{opacity:0;transform:translateX(-16px) scale(.96)}
+.buypop.in {opacity:1;transform:translate3d(0,0,0) scale(1)}
+.buypop.out{opacity:0;transform:translate3d(0,-14px,0) scale(.97);
+            transition-duration:.26s,.38s}
 
-/* a sheen crosses each card once as it arrives */
+/* a sheen crosses the card once as it arrives */
 .buypop::after{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(104deg,transparent 34%,rgba(168,220,43,.20) 50%,transparent 66%);
-  background-size:240% 100%;background-position:200% 0;
+  content:'';position:absolute;top:-30%;bottom:-30%;left:0;width:55%;
+  pointer-events:none;
+  background:linear-gradient(104deg,transparent,rgba(168,220,43,.28) 50%,transparent);
+  transform:translate3d(-200%,0,0);
 }
-.buypop.in::after{animation:sweep 1.5s var(--ease-out) .25s 1}
+.buypop.in::after{animation:sweep 1.5s var(--ease-out) .3s 1}
 
 .bp-emo{
-  flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;
-  font-size:21px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.22);
+  flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  font-size:20px;background:rgba(61,220,132,.15);border:1px solid rgba(61,220,132,.22);
 }
-.bp-body{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
-.bp-top{font-size:10.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--text-inv-mute)}
-.bp-top b{color:var(--lime-300);font-weight:800}
+.bp-body{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.bp-top{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--text-inv-mute)}
 .bp-amt{
   font-family:var(--font-display);font-weight:800;font-size:16px;letter-spacing:-.02em;
   color:var(--up);font-variant-numeric:tabular-nums;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-.bp-sub{font-size:11px;color:var(--text-inv-mute);font-family:var(--font-mono)}
+.bp-usd{
+  flex:none;font-family:var(--font-display);font-weight:800;font-size:17px;
+  letter-spacing:-.02em;color:var(--lime-300);font-variant-numeric:tabular-nums;
+}
 
 /* the bigger the bag, the louder the card */
 .buypop.big{border-color:rgba(168,220,43,.55)}
@@ -1043,18 +1084,38 @@ body.bar-up .buypop-wrap{bottom:calc(80px + env(safe-area-inset-bottom))}
   box-shadow:0 18px 46px -16px rgba(0,0,0,.95),0 0 0 1px rgba(255,212,71,.2),
              inset 0 1px 0 rgba(255,255,255,.12);
 }
-.buypop.whale .bp-emo{background:rgba(255,212,71,.16);border-color:rgba(255,212,71,.34);font-size:23px}
-.buypop.whale .bp-amt{color:var(--gold)}
-.buypop.whale .bp-top b{color:var(--gold)}
-
-@media (hover:hover) and (pointer:fine){
-  .buypop:hover{transform:translateX(3px)}
-}
+.buypop.whale .bp-emo{background:rgba(255,212,71,.16);border-color:rgba(255,212,71,.34);font-size:22px}
+.buypop.whale .bp-amt,
+.buypop.whale .bp-usd{color:var(--gold)}
 
 @media (min-width:700px){
-  /* the bar is a phone affordance, so there is nothing to clear here */
+  /* the buy bar is a phone affordance, so there is nothing to clear here */
   .buypop-wrap,
-  body.bar-up .buypop-wrap{left:20px;right:auto;bottom:20px;width:310px}
+  body.bar-up .buypop-wrap{
+    left:20px;right:auto;bottom:20px;padding:0;transform:none;justify-content:flex-start;
+  }
+  .buypop{width:320px}
+}
+
+/* ═══════════════════════════════════════════════ mobile: cheaper glass ══ */
+/*
+   backdrop-filter has to recompute whenever anything behind it changes, and
+   the mesh behind this page is always drifting. The cost scales with the blur
+   radius, so phones get a smaller one — at phone size the panels are small
+   enough that nobody can tell the difference, and the frame budget is small
+   enough that everybody can.
+*/
+@media (max-width:699px){
+  .lg{backdrop-filter:blur(9px) saturate(175%) brightness(1.05);
+      -webkit-backdrop-filter:blur(9px) saturate(175%) brightness(1.05)}
+  .lg-d{backdrop-filter:blur(10px) saturate(140%);
+        -webkit-backdrop-filter:blur(10px) saturate(140%)}
+  .btn-glass{backdrop-filter:blur(8px) saturate(160%);
+             -webkit-backdrop-filter:blur(8px) saturate(160%)}
+  .nav.stuck{backdrop-filter:blur(11px) saturate(170%);
+             -webkit-backdrop-filter:blur(11px) saturate(170%)}
+  .buybar{backdrop-filter:blur(11px) saturate(160%);
+          -webkit-backdrop-filter:blur(11px) saturate(160%)}
 }
 
 /* one-click failure report, for whoever runs the site */

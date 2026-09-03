@@ -148,6 +148,27 @@
   }, { rootMargin: '-45% 0px -50% 0px' });
   secs.forEach(function (s) { spy.observe(s); });
 
+  /* ------------------------------------------------- the light on the glass */
+  /* Each glass panel catches the light once, as it comes into view, and is
+     then completely static. It used to loop forever on every panel; because a
+     panel is a backdrop-filter surface, that meant the browser re-blurred the
+     whole page behind all of them on every single frame. Firing it once costs
+     almost nothing and reads as a reaction to the panel arriving. */
+  var lit = new IO(function (entries) {
+    entries.forEach(function (en) {
+      if (!en.isIntersecting) return;
+      lit.unobserve(en.target);
+      var el = en.target;
+      el.classList.add('lit');
+      // Drop the class again so the element stops being an animation target
+      // and the compositor can release its layer.
+      var off = function () { el.classList.remove('lit'); };
+      el.addEventListener('animationend', off, { once: true });
+      setTimeout(off, 2600);                   // in case the event never fires
+    });
+  }, { threshold: 0.15 });
+  $$('.lg').forEach(function (el) { lit.observe(el); });
+
   /* --------------------------------------------------------- reveal on scroll */
   var rv = new IO(function (entries) {
     entries.forEach(function (en) {
